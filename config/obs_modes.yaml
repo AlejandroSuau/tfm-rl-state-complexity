@@ -1,0 +1,6 @@
+modes:
+  - minimal
+  - bool_power
+  - power_time
+  - coins_quadrants
+  - image

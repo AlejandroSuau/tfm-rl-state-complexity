@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+
+# Virtual envs
+.venv/
+env/
+venv/
+.conda/
+
+# Local configuration
+.python-version
+
+# Log & temp files
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# Experiments & train outputs
+experiments/logs/
+experiments/runs/
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Tools
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# Big data
+data/
