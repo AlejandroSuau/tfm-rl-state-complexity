@@ -53,7 +53,7 @@ class SimplePacmanEnv(gym.Env):
         if self.grid[self.player_pos] == 3:
             reward += self.rewards["power"]
             self.grid[self.player_pos] = 0
-            self.power_timer = self.cfg.power_duration
+            self.power_timer = max(self.cfg.power_duration, 80)
             self.power_pellets_remaining -= 1
 
         # Colisión con fantasma
@@ -102,7 +102,7 @@ class SimplePacmanEnv(gym.Env):
             "power": 5.0,
             "eat_ghost": 10.0,
             "death": -20.0,
-            "step": -0.01,
+            "step": -0.001,
             "clear": 50.0,
         }
 
@@ -127,7 +127,7 @@ class SimplePacmanEnv(gym.Env):
         # coloca monedas en celdas vacías (no muro)
         empties = list(zip(*np.where(self.grid == 0)))
         self.rng.shuffle(empties)
-        n_coins = int(0.25 * len(empties))
+        n_coins = int(0.40 * len(empties))
         for pos in empties[:n_coins]:
             self.grid[pos] = 2
         self.coins_remaining = n_coins
@@ -152,8 +152,8 @@ class SimplePacmanEnv(gym.Env):
             self.player_pos = (ny, nx)
 
     def _move_ghost(self):
-        # política simple: 70% moverse hacia el jugador, 30% aleatorio
-        if self.rng.random() < 0.7:
+        # política simple: 50% moverse hacia el jugador, 50% aleatorio
+        if self.rng.random() < 0.5:
             dy = np.sign(self.player_pos[0] - self.ghost_pos[0])
             dx = np.sign(self.player_pos[1] - self.ghost_pos[1])
             candidates = [(dy,0), (0,dx)]

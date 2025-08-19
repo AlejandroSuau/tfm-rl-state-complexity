@@ -10,9 +10,12 @@ from rlpacman.utils.seeding import set_global_seed
 
 ALGOS = {"ppo": PPO, "dqn": DQN}
 
-def make_env(obs_mode: str, seed: int):
+def make_env(obs_mode: str, seed: int, logdir: str, split: str):
+    os.makedirs(logdir, exist_ok=True)
     env = SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed)
-    return Monitor(env)
+    monitor_path = os.path.join(logdir, f"monitor_{split}.csv")
+    env = Monitor(env, filename=monitor_path)
+    return env
 
 def main():
     parser = argparse.ArgumentParser()
@@ -24,34 +27,31 @@ def main():
     parser.add_argument("--savedir", type=str, default="experiments/runs")
     args = parser.parse_args()
 
-    os.makedirs(args.logdir, exist_ok=True)
-    os.makedirs(args.savedir, exist_ok=True)
+    run_name = f"{args.algo}_{args.obs_mode}_seed{args.seed}"
+    run_logdir = os.path.join(args.logdir, run_name)
+    run_savedir = os.path.join(args.savedir, run_name)
+    os.makedirs(run_logdir, exist_ok=True)
+    os.makedirs(run_savedir, exist_ok=True)
 
     set_global_seed(args.seed)
 
-    train_env = make_env(args.obs_mode, args.seed)
-    eval_env = make_env(args.obs_mode, args.seed + 123)
+    train_env = make_env(args.obs_mode, args.seed, run_logdir, split="train")
+    eval_env = make_env(args.obs_mode, args.seed + 123, run_logdir, split="eval")
 
     model_cls = ALGOS[args.algo]
     policy = "MlpPolicy" if args.obs_mode != "image" else "CnnPolicy"
-    model = model_cls(policy, train_env, verbose=1, tensorboard_log=args.logdir, seed=args.seed)
+    model = model_cls(policy, train_env, verbose=1, tensorboard_log=run_logdir, seed=args.seed)
 
-    callbacks = build_callbacks(
-        savedir=f"{args.savedir}/{args.algo}_{args.obs_mode}",
-        logdir=f"{args.logdir}/{args.algo}_{args.obs_mode}",
-        eval_env=eval_env,
-        eval_freq=10_000,
-    )
+    callbacks = build_callbacks(savedir=run_savedir, logdir=run_logdir, eval_env=eval_env, eval_freq=10_000)
 
-    logger = configure(f"{args.logdir}/{args.algo}_{args.obs_mode}", ["stdout", "tensorboard"])
+    logger = configure(run_logdir, ["stdout", "tensorboard", "csv"])
     model.set_logger(logger)
 
     model.learn(total_timesteps=args.steps, callback=callbacks)
-    model.save(f"{args.savedir}/{args.algo}_{args.obs_mode}/final_model")
+    model.save(os.path.join(run_savedir, "final_model"))
 
     train_env.close()
     eval_env.close()
-
 
 if __name__ == "__main__":
     main()
