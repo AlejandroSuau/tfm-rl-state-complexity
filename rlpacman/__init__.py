@@ -1,1 +1,0 @@
-from .envs.simple_pacman import SimplePacmanEnv, ObsConfig

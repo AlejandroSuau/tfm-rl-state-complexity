@@ -1,0 +1,9 @@
+# tfm_rl/configs/algos/a2c.yaml
+policy_kwargs: {}
+learning_rate: 0.0007
+n_steps: 5
+gamma: 0.99
+gae_lambda: 1.0
+ent_coef: 0.01
+vf_coef: 0.5
+max_grad_norm: 0.5

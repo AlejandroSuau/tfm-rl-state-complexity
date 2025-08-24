@@ -1,0 +1,14 @@
+# tfm_rl/configs/experiment.yaml
+total_timesteps: 1000000
+n_envs: 8
+subproc: true
+seed: 42
+grid_size: [15, 15]
+max_steps: 600
+power_duration: 40
+obs_mode: minimal            # minimal | bool_power | power_time | coins_quadrants | image
+record_video: false
+video_length: 1200
+log_dir: runs
+eval_episodes: 15
+checkpoint_freq: 100000
