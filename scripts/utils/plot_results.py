@@ -18,8 +18,9 @@ def main():
         raise SystemExit(f"No existe {METRICS_CSV}. Ejecuta primero eval_collect.py")
     os.makedirs(OUT_DIR, exist_ok=True)
     df = pd.read_csv(METRICS_CSV)
-    barplot(df, "mean_reward", os.path.join(OUT_DIR, "plot_mean_reward.png"), "Recompensa media")
-    barplot(df, "success_rate", os.path.join(OUT_DIR, "plot_success_rate.png"), "Tasa de éxito")
-
+    barplot(df, "mean_reward",      os.path.join(OUT_DIR, "plot_mean_reward.png"),      "Recompensa media")
+    barplot(df, "success_rate",     os.path.join(OUT_DIR, "plot_success_rate.png"),     "Tasa de éxito")
+    barplot(df, "completion_ratio", os.path.join(OUT_DIR, "plot_completion_ratio.png"), "Ratio de completado (medio)")
+    barplot(df, "near_clear_rate",  os.path.join(OUT_DIR, "plot_near_clear_rate.png"),  "Éxito ≥90%")
 if __name__ == "__main__":
     main()

@@ -1,0 +1,9 @@
+algo,obs_mode,seed,model_path
+ppo,minimal,0,models\pacman_ppo_minimal_seed0.zip
+ppo,minimal,1,models\pacman_ppo_minimal_seed1.zip
+ppo,bool_power,0,models\pacman_ppo_bool_power_seed0.zip
+ppo,bool_power,1,models\pacman_ppo_bool_power_seed1.zip
+ppo,power_time,0,models\pacman_ppo_power_time_seed0.zip
+ppo,power_time,1,models\pacman_ppo_power_time_seed1.zip
+ppo,coins_quadrants,0,models\pacman_ppo_coins_quadrants_seed0.zip
+ppo,coins_quadrants,1,models\pacman_ppo_coins_quadrants_seed1.zip

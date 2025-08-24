@@ -8,6 +8,7 @@ def evaluate_model(model_path: str, obs_mode: str, episodes: int, seed: int=123)
     env = SimplePacmanEnv(obs_config=ObsConfig(mode=obs_mode), seed=seed)
     model = PPO.load(model_path, env=env)
     rewards, lengths, success = [], [], []
+    ratios, near = [], 0
     for ep in range(episodes):
         obs, info = env.reset(seed=seed+ep)
         ep_r, steps = 0.0, 0
@@ -15,12 +16,29 @@ def evaluate_model(model_path: str, obs_mode: str, episodes: int, seed: int=123)
             action, _ = model.predict(obs, deterministic=True)
             obs, r, terminated, truncated, info = env.step(action)  # el env ya normaliza la acción
             ep_r += float(r); steps += 1
+            
             if terminated or truncated:
+                end_coins = info.get("coins_remaining", None)
+                total = info.get("coins_total", None)
+                if (total is not None) and total > 0 and (end_coins is not None):
+                    r = 1.0 - float(end_coins)/float(total)
+                    ratios.append(r)
+                    if r >= 0.90:
+                        near += 1
+
                 rewards.append(ep_r)
                 lengths.append(steps)
-                success.append(1 if info.get("coins_remaining", 1) == 0 else 0)
+                success.append(1 if end_coins == 0 else 0)
                 break
-    return float(np.mean(rewards)), float(np.std(rewards)), float(np.mean(lengths)), float(np.mean(success))
+    
+    mean_r = float(np.mean(rewards)) if rewards else 0.0
+    std_r  = float(np.std(rewards)) if rewards else 0.0
+    mean_len = float(np.mean(lengths)) if lengths else 0.0
+    succ_rate = float(np.mean(success)) if success else 0.0
+    mean_ratio = float(np.mean(ratios)) if ratios else 0.0
+    near_rate = float(near/episodes)
+
+    return mean_r, std_r, mean_len, succ_rate, mean_ratio, near_rate
 
 def parse_index_or_glob(index_csv: str):
     if os.path.exists(index_csv):
@@ -38,7 +56,7 @@ def parse_index_or_glob(index_csv: str):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--index", type=str, default="experiments/run_index.csv")
-    ap.add_argument("--episodes", type=int, default=30)
+    ap.add_argument("--episodes", type=int, default=50)
     ap.add_argument("--out", type=str, default="experiments/metrics.csv")
     args = ap.parse_args()
 
@@ -52,15 +70,15 @@ def main():
     with open(args.out, "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         if write_header:
-            w.writerow(["algo","obs_mode","seed","episodes","mean_reward","std_reward","mean_len","success_rate","model_path"])
+            w.writerow(["algo","obs_mode","seed","episodes","mean_reward","std_reward","mean_len","success_rate","completion_ratio","near_clear_rate","model_path"])
         for r in rows:
             algo, obs_mode, seed, model_path = r["algo"], r["obs_mode"], int(r["seed"]), r["model_path"]
             if not os.path.exists(model_path):
                 print(f"[WARN] no existe {model_path}, salto")
                 continue
             print(f"[EVAL] {algo} | {obs_mode} | seed={seed}")
-            mean_r, std_r, mean_len, succ = evaluate_model(model_path, obs_mode, episodes=args.episodes, seed=123)
-            w.writerow([algo, obs_mode, seed, args.episodes, mean_r, std_r, mean_len, succ, model_path])
+            mean_r, std_r, mean_len, succ, mean_ratio, near_rate = evaluate_model(model_path, obs_mode, episodes=args.episodes, seed=123)
+            w.writerow([algo, obs_mode, seed, args.episodes, mean_r, std_r, mean_len, succ, mean_ratio, near_rate, model_path])
     print(f"[OK] métricas en {args.out}")
 
 if __name__ == "__main__":

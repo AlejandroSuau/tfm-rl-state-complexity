@@ -12,19 +12,22 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--gamma", type=float, default=0.995)
     ap.add_argument("--ent-coef", type=float, default=0.01)
+    ap.add_argument("--net-arch", type=str, default="128,128", help="Tamaños MLP separados por coma, p.ej. '64,64' o '128,128,64'")
     args = ap.parse_args()
 
     # Crear entorno
     env = SimplePacmanEnv(obs_config=ObsConfig(mode=args.obs_mode), seed=args.seed)
 
     # Modelo PPO con política MLP (tablas/vecinos)
+    net_arch = [int(x) for x in args.net_arch.split(",") if x.strip()]
     model = PPO(
         policy="MlpPolicy",
         env=env,
         seed=args.seed,
         verbose=1,
         gamma=args.gamma,
-        ent_coef=args.ent_coef)
+        ent_coef=args.ent_coef,
+        policy_kwargs=dict(net_arch=net_arch))
 
     # Entrenar
     model.learn(total_timesteps=int(args.timesteps), progress_bar=True)
@@ -44,6 +47,9 @@ def main():
             "obs_mode":args.obs_mode,
             "timesteps":args.timesteps,
             "seed":args.seed,
+            "gamma":args.gamma,
+            "ent_coef":args.ent_coef,
+            "net_arch":net_arch,
             "model_path":model_path,
             "run_info": info_path
         }
