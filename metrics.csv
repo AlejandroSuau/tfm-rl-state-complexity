@@ -1,9 +1,0 @@
-algo,obs_mode,seed,episodes,mean_reward,std_reward,mean_len,success_rate,completion_ratio,near_clear_rate,model_path
-ppo,minimal,0,50,35.8,39.42638710305574,376.32,0.0,0.365625,0.0,models\pacman_ppo_minimal_seed0.zip
-ppo,minimal,1,50,0.36,26.97388366550134,113.76,0.0,0.204375,0.0,models\pacman_ppo_minimal_seed1.zip
-ppo,bool_power,0,50,6.12,25.077990350105807,190.06,0.0,0.2509375,0.0,models\pacman_ppo_bool_power_seed0.zip
-ppo,bool_power,1,50,4.62,24.586898950457336,137.58,0.0,0.2525,0.0,models\pacman_ppo_bool_power_seed1.zip
-ppo,power_time,0,50,9.08,33.72348736415022,92.68,0.0,0.2490625,0.0,models\pacman_ppo_power_time_seed0.zip
-ppo,power_time,1,50,-4.76,20.306215797139554,74.42,0.0,0.1753125,0.0,models\pacman_ppo_power_time_seed1.zip
-ppo,coins_quadrants,0,50,13.2,30.621561031404,198.92,0.0,0.3046875,0.0,models\pacman_ppo_coins_quadrants_seed0.zip
-ppo,coins_quadrants,1,50,13.12,34.88589399743111,230.9,0.0,0.2728125,0.0,models\pacman_ppo_coins_quadrants_seed1.zip

@@ -35,11 +35,12 @@ ACTIONS: Dict[int, Tuple[int, int]] = {
 # }
 
 DEFAULT_REWARDS = {
-  "coin": 2.0,
-  "power": 10.0,
-  "eat_ghost": 20.0,
-  "death": -30.0,
-  "step": 0.0,
-  "clear": 60.0,
-  "power_tick": 0.05,
+    "coin": 2.5,           
+    "power": 8.0,          
+    "eat_ghost": 12.0,     
+    "death": -30.0,
+    "step": 0.0,
+    "clear": 80.0,         
+    "power_tick": 0.02,    
+    "coin_power_bonus": 0.5,
 }

@@ -72,6 +72,9 @@ class SimplePacmanEnv(gym.Env):
         # --- Collect coin ---
         if self.grid[self.player_pos] == COIN:
             reward += self.rewards["coin"]
+            if self.power_timer > 0:
+                reward += self.rewards.get("coin_power_bonus", 0.0)
+
             self.grid[self.player_pos] = EMPTY
             self.coins_remaining -= 1
 
