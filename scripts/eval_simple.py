@@ -33,7 +33,7 @@ def main():
     model = PPO.load(args.model, env=env)
 
     rewards, lengths, success = [], [], []
-    ratios, coins_list = [], []
+    ratios, coins_list, powers, ghosts = [], [], [], []
     deaths = 0
     wins = 0
     trunc_count = 0
@@ -83,6 +83,8 @@ def main():
                 elif truncated:
                     trunc_count += 1
 
+                powers.append(info.get("powers_picked", 0))
+                ghosts.append(info.get("ghosts_eaten", 0))
                 rewards.append(ep_r)
                 lengths.append(steps)
                 success.append(1 if (end_coins == 0) else 0)
@@ -97,6 +99,8 @@ def main():
     print(f"   Recompensa media = {mean_r:.2f} ± {std_r:.2f}")
     print(f"   Pasos medios     = {mean_len:.1f}")
     print(f"   Éxito (todas monedas) = {succ_rate:.2%}")
+    print(f"   Powers recogidos (media) = {np.mean(powers):.2f}")
+    print(f"   Fantasmas comidos (media) = {np.mean(ghosts):.2f}")
     if ratios:
         print(f"   % nivel completado (medio) = {100.0 * sum(ratios)/len(ratios):.1f}%")
         print(f"   Éxito 90%+ = {near_clear/args.episodes:.2%}")

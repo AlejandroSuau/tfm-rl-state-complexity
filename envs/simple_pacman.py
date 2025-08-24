@@ -37,6 +37,8 @@ class SimplePacmanEnv(gym.Env):
 
         self.steps = 0
         self.power_timer = 0
+        self.powers_picked = 0
+        self.ghosts_eaten = 0
 
         # Place player and ghost in random empty cells
         self.player_pos = self._find_empty()
@@ -79,10 +81,12 @@ class SimplePacmanEnv(gym.Env):
             self.grid[self.player_pos] = EMPTY
             self.power_timer = int(self.cfg.power_duration)
             self.power_pellets_remaining -= 1
+            self.powers_picked += 1
 
         # --- Collision with ghost ---
         if self.player_pos == self.ghost_pos:
             if self.power_timer > 0:  # Ghost is vulnerable
+                self.ghosts_eaten += 1
                 reward += self.rewards["eat_ghost"]
                 self.ghost_pos = self._find_empty()
             else:  # Player dies
@@ -99,6 +103,7 @@ class SimplePacmanEnv(gym.Env):
 
         # --- Update timers ---
         if self.power_timer > 0:
+            reward += self.rewards.get("power_tick", 0.0)
             self.power_timer -= 1
 
         truncated = self.steps >= self.cfg.max_steps
@@ -153,7 +158,7 @@ class SimplePacmanEnv(gym.Env):
         # Place coins
         empties = list(zip(*np.where(self.grid == EMPTY)))
         self.rng.shuffle(empties)
-        n_coins = int(0.40 * len(empties))
+        n_coins = int(0.30 * len(empties))
         for pos in empties[:n_coins]:
             self.grid[pos] = COIN
         self.coins_remaining = n_coins
@@ -182,7 +187,7 @@ class SimplePacmanEnv(gym.Env):
 
     def _move_ghost(self):
         """Simple ghost policy: 50% chase, 50% random move."""
-        if self.rng.random() < 0.5:
+        if self.rng.random() < 0.35:
             dy = np.sign(self.player_pos[0] - self.ghost_pos[0])
             dx = np.sign(self.player_pos[1] - self.ghost_pos[1])
             candidates = [(dy, 0), (0, dx)]
@@ -247,6 +252,8 @@ class SimplePacmanEnv(gym.Env):
         """Extra diagnostic info returned with each step."""
         return {
             "steps": self.steps,
+            "powers_picked": int(getattr(self, "powers_picked", 0)),
+            "ghosts_eaten": int(getattr(self, "ghosts_eaten", 0)),
             "coins_remaining": int(self.coins_remaining),
             "coins_total": int(getattr(self, "coins_total", 0)), 
             "power_timer": int(self.power_timer),
