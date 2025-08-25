@@ -1,12 +1,10 @@
-# 25.08.2025 – Shaping alineado (fase A), VecNormalize activado
+# 25.08.2025 – 1M pasos, shaping alineado (minimal vs power_time), 4 semillas
 
-## Cambios
+## Qué se ha hecho
 
-* Recompensas:
-coin=3.0, power=6.0, eat_ghost=8.0, clear=120.0, death=-30.0, step=0.0,
-power_tick=0.0 (eliminado), coin_power_bonus=1.2 (↑).
-* Train/Eval con VecNormalize (obs normalizadas; reward crudo en eval).
-* Comparativa focal: minimal vs power_time (300k pasos).
+* Entrenamiento con VecNormalize y recompensas alineadas
+(coin=3.0, power=6.0, eat_ghost=8.0, clear=120.0, power_tick=0, coin_power_bonus=1.2).
+* Modos evaluados: minimal y power_time. Episodios de eval: 50.
 
 ## Motivación
 
@@ -15,12 +13,14 @@ power_tick=0.0 (eliminado), coin_power_bonus=1.2 (↑).
 
 ## Resultados
 
-* completion_ratio: power_time > minimal (≈ 0.57 vs 0.44).
-* near_clear_rate: power_time > 0 (~2%); minimal = 0.
-* mean_reward: power_time claramente superior.
-* success_rate (100%): 0 en ambos.
+* completion_ratio: minimal > power_time (≈ 0.68 vs 0.62).
+* near_clear_rate: ≈ 10–12% en ambos (antes era ~0–2%).
+* success_rate: 0 (posible límite de max_steps=600).
+* mean_reward: power_time > minimal.
 
 ## Conclusión breve
 
-* El shaping alineado hace que la info de power sí ayude a progresar (no solo a puntuar).
-* Siguiente: replicar con semillas; si se mantiene, escalar a 1M pasos (minimal vs power_time) para resultados finales.
+* El shaping nuevo mejoró mucho el progreso (near-clear).
+* power_time monetiza más (recompensa) pero convierte ligeramente peor ese puntuar en limpiar antes del límite de pasos.
+* Siguiente paso: PPO multi-entorno para estabilidad/eficiencia; opcionalmente DQN piloto para comparar algoritmo.
+* 
