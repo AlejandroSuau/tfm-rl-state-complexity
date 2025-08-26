@@ -22,9 +22,10 @@ def build_eval_env(obs_mode: str, seed: int, vecnorm_path: str | None):
         venv = VecNormalize.load(vecnorm_path, base)
         venv.training = False
         venv.norm_reward = False
+        print(f"[INFO] VecNormalize cargado: {vecnorm_path}")
         return venv
     else:
-        # evaluación sin normalización (fallback)
+        print("[WARN] Sin VecNormalize (.pkl no encontrado). Eval sin normalizar -> rendimiento menor.")
         return SimplePacmanEnv(obs_config=ObsConfig(mode=obs_mode), seed=seed)
 
 

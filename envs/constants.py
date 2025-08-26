@@ -15,32 +15,21 @@ ACTIONS: Dict[int, Tuple[int, int]] = {
     4: (0, 0), # no-op
 }
 
-# Default rewards
-#DEFAULT_REWARDS: Dict[str, float] = {
-#    "coin": 1.0,
-#    "power": 5.0,
-#    "eat_ghost": 10.0,
-#    "death": -20.0,
-#    "step": -0.001,
-#    "clear": 50.0,
-#}
-
-# DEFAULT_REWARDS: Dict[str, float] = {
-#     "coin": 2.0,
-#     "power": 5.0,
-#     "eat_ghost": 10.0,
-#     "death": -30.0,   # antes -10
-#     "step": 0.0,      # mantenemos 0 para no incentivar acabar pronto
-#     "clear": 50.0,
-# }
-
 DEFAULT_REWARDS = {
-    "coin": 3.0,             
-    "power": 6.0,            
-    "eat_ghost": 8.0,        
-    "death": -30.0,
-    "step": 0.0,
-    "clear": 120.0,         
-    "power_tick": 0.0,      
-    "coin_power_bonus": 1.2,
+    # Moneda barata: farmear muchas monedas ya no gana a terminar
+    "coin": 1.5,
+    # Power y fantasma valen, pero no dominan
+    "power": 3.0,
+    "eat_ghost": 5.0,
+    # Terminar tiene que ganar SIEMPRE
+    "clear": 250.0,
+    # Morir duele más para que no compense el “suicidio rápido”
+    "death": -60.0,
+    # Penalización por paso para empujar a terminar rápido (se normaliza con VecNorm)
+    "step": -0.01,
+    # Nada de goteo por estar en power
+    "power_tick": 0.0,
+    # Un pequeño empujón extra si pillas moneda en power (pero pequeño)
+    "coin_power_bonus": 0.25,
 }
+

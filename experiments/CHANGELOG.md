@@ -1,26 +1,18 @@
-# 25.08.2025 – 1M pasos, shaping alineado (minimal vs power_time), 4 semillas
+# 26.08.2025 – 1M pasos, shaping alineado (minimal vs power_time), 4 semillas
 
-## Qué se ha hecho
+## Qué se añadió / cambió (esta tanda):
 
-* Entrenamiento con VecNormalize y recompensas alineadas
-(coin=3.0, power=6.0, eat_ghost=8.0, clear=120.0, power_tick=0, coin_power_bonus=1.2).
-* Modos evaluados: minimal y power_time. Episodios de eval: 50.
+* Recompensas re-balanceadas: monedas bajas, muerte más costosa, paso negativo suave, clear muy alto. VecNormalize activo y evaluación con las stats correctas.
+* Barrido 3M ts con 8 envs y rollouts largos (n_steps=1024, batch=8192, ent_coef=0.005), 4 modos y 4 seeds.
+* Resultado: sube el completion ratio (~0.38–0.39, mejor en coins_quadrants) pero sin clears.
 
-## Motivación
+## Conclusiones:
 
-* Evitar “farmear power” y empujar a recoger monedas y terminar el nivel.
-* Ver si la mayor complejidad del estado (tiempo de power) aporta ventaja cuando la recompensa está alineada.
+* El shaping actual fomenta recoger monedas pero no da señal de fin; el agente se estabiliza en “coger bastantes y morir/tiempo”.
+* Más timesteps sin cambiar señal rara vez desbloquea clears.
 
-## Resultados
+## Acciones recomendadas:
 
-* completion_ratio: minimal > power_time (≈ 0.68 vs 0.62).
-* near_clear_rate: ≈ 10–12% en ambos (antes era ~0–2%).
-* success_rate: 0 (posible límite de max_steps=600).
-* mean_reward: power_time > minimal.
-
-## Conclusión breve
-
-* El shaping nuevo mejoró mucho el progreso (near-clear).
-* power_time monetiza más (recompensa) pero convierte ligeramente peor ese puntuar en limpiar antes del límite de pasos.
-* Siguiente paso: PPO multi-entorno para estabilidad/eficiencia; opcionalmente DQN piloto para comparar algoritmo.
-* 
+* Bonus de últimos coins (señal de final → debería subir near_clear_rate).
+* Dirección al coin más cercano (coins_quadrants_dir) para guiar la ruta.
+* Si hace falta, bajar leve la agresividad del fantasma como mini-currículum.

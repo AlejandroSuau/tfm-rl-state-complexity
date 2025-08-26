@@ -161,7 +161,7 @@ class SimplePacmanEnv(gym.Env):
         # Place coins
         empties = list(zip(*np.where(self.grid == EMPTY)))
         self.rng.shuffle(empties)
-        n_coins = int(0.30 * len(empties))
+        n_coins = int(0.40 * len(empties))
         for pos in empties[:n_coins]:
             self.grid[pos] = COIN
         self.coins_remaining = n_coins

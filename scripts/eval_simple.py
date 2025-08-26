@@ -35,9 +35,11 @@ def build_env(obs_mode: str, seed: int, vecnorm_path: str | None):
         venv = VecNormalize.load(vecnorm_path, base)
         venv.training = False
         venv.norm_reward = False
-        return venv  # VecEnv
+        print(f"[INFO] VecNormalize cargado: {vecnorm_path}")
+        return venv
     else:
-        return SimplePacmanEnv(obs_config=ObsConfig(mode=obs_mode), seed=seed)  # env normal
+        print("[WARN] Sin VecNormalize (.pkl no encontrado). Eval sin normalizar -> rendimiento menor.")
+        return SimplePacmanEnv(obs_config=ObsConfig(mode=obs_mode), seed=seed)
 
 
 def get_init_info(env, seed_base: int, ep_idx: int, vec: bool):
@@ -46,13 +48,16 @@ def get_init_info(env, seed_base: int, ep_idx: int, vec: bool):
     Con VecEnv no hay 'info' en reset; usamos get_attr para leer el estado.
     """
     if vec:
-        obs = env.reset()  # np.array shape (1, obs_dim)
+        obs = env.reset()
         try:
-            init_coins = int(env.get_attr("coins_remaining")[0])
+            init_coins  = int(env.get_attr("coins_remaining")[0])
         except Exception:
-            init_coins = None
-        info = {"coins_remaining": init_coins,
-                "coins_total": int(env.get_attr("coins_total")[0]) if init_coins is not None else None}
+            init_coins  = None
+        try:
+            total_coins = int(env.get_attr("coins_total")[0])
+        except Exception:
+            total_coins = None
+        info = {"coins_remaining": init_coins, "coins_total": total_coins}
         return obs, info, init_coins
     else:
         obs, info = env.reset(seed=seed_base + ep_idx)
@@ -75,7 +80,7 @@ def step_once(env, obs, action, vec: bool):
         info = infos[0] if isinstance(infos, (list, tuple)) else infos
         # si el entorno añade flags, los usamos; si no, distinguimos por coins
         terminated = bool(info.get("terminated", done))
-        truncated = bool(info.get("truncated", False))
+        truncated = bool(info.get("TimeLimit.truncated", info.get("truncated", False)))
         return obs, r, terminated, truncated, info
     else:
         # entorno normal Gymnasium (devuelve 5 valores)

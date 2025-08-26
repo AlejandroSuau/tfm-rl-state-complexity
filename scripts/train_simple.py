@@ -1,52 +1,65 @@
 from __future__ import annotations
 import argparse, time, os, json
+from typing import Callable, List
+from gymnasium.spaces import Discrete
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
+from stable_baselines3.common.monitor import Monitor
 from envs.simple_pacman import SimplePacmanEnv, ObsConfig
 
-def make_env(obs_mode: str, seed: int):
-    """Envolvemos el env en un thunk para DummyVecEnv (1 entorno)."""
-    def _thunk():
-        return SimplePacmanEnv(obs_config=ObsConfig(mode=obs_mode), seed=seed)
-    return _thunk
+# --- helper para crear workers vecenv (compatible con Windows/subprocess) ---
+def make_env(obs_mode: str, seed: int, rank: int) -> Callable[[], SimplePacmanEnv]:
+    def _init():
+        env = SimplePacmanEnv(obs_config=ObsConfig(mode=obs_mode), seed=seed + rank)
+        return Monitor(env)
+    return _init
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--timesteps", type=int, default=200000)
     ap.add_argument("--obs-mode", default="minimal",
-                    choices=["minimal","bool_power","power_time","coins_quadrants"], 
-                    help="Mantén 'minimal' para empezar. 'image' se deja para más adelante.")
+                    choices=["minimal","bool_power","power_time","coins_quadrants"])
     ap.add_argument("--seed", type=int, default=0)
+
+    # Hiperparámetros PPO típicos
     ap.add_argument("--gamma", type=float, default=0.995)
     ap.add_argument("--ent-coef", type=float, default=0.01)
-    ap.add_argument("--net-arch", type=str, default="128,128", help="Tamaños MLP separados por coma, p.ej. '64,64' o '128,128,64'")
+    ap.add_argument("--lr", type=float, default=2.5e-4)
+    ap.add_argument("--net-arch", type=str, default="128,128")  # "64,64" o "128,128,64", etc.
 
-     # Parámetros de VecNormalize
-    ap.add_argument("--norm-obs", dest="norm_obs", action="store_true")
-    ap.add_argument("--no-norm-obs", dest="norm_obs", action="store_false")
-    ap.set_defaults(norm_obs=True)
+    # --- NUEVO: multi-entorno / tamaño de rollout ---
+    ap.add_argument("--n-envs", type=int, default=8, help="nº de entornos en paralelo (8 recomendado)")
+    ap.add_argument("--n-steps", type=int, default=256, help="pasos por entorno antes de cada update")
+    ap.add_argument("--batch-size", type=int, default=2048, help="tamaño de batch por update")
+    ap.add_argument("--n-epochs", type=int, default=10, help="épocas por update PPO")
 
-    ap.add_argument("--norm-reward", dest="norm_reward", action="store_true")
-    ap.add_argument("--no-norm-reward", dest="norm_reward", action="store_false")
-    ap.set_defaults(norm_reward=True)
-
-    ap.add_argument("--clip-obs", type=float, default=5.0)
-    ap.add_argument("--clip-reward", type=float, default=10.0)
+    # ---- gSDE
+    ap.add_argument("--use-sde", type=int, default=0)
+    ap.add_argument("--sde-sample-freq", type=int, default=4)
+    ap.add_argument("--ortho-init", type=int, default=0)
+    ap.add_argument("--clip-range", type=float, default=0.2)
+    ap.add_argument("--gae-lambda", type=float, default=0.95)
 
     args = ap.parse_args()
+    # --------- construir vecenv ----------
+    if args.n_envs > 1:
+        # SubprocVecEnv usa procesos → más estable/rápido para PPO
+        env_fns: List[Callable] = [make_env(args.obs_mode, args.seed, i) for i in range(args.n_envs)]
+        base_venv = SubprocVecEnv(env_fns)
+    else:
+        base_venv = DummyVecEnv([make_env(args.obs_mode, args.seed, 0)])
 
-    # ---------- VecEnv + VecNormalize (1 entorno es suficiente para usar VN) ----------
-    vec = DummyVecEnv([make_env(args.obs_mode, args.seed)])
-    vec = VecNormalize(
-        vec,
-        norm_obs=args.norm_obs,
-        norm_reward=args.norm_reward,
-        clip_obs=args.clip_obs,
-        clip_reward=args.clip_reward,
-        gamma=args.gamma,
-    )
+    # Normalización (obs y reward) durante el train
+    vec = VecNormalize(base_venv, norm_obs=True, norm_reward=True, clip_reward=10.0)
 
-    # ---------- Modelo PPO ----------
+    is_discrete = isinstance(base_venv.action_space, Discrete)
+    use_sde_flag = bool(getattr(args, "use_sde", 0))
+    if is_discrete and use_sde_flag:
+        print("[WARN] gSDE no soportado en acciones discretas. Desactivando use_sde.")
+        use_sde_flag = False
+
+
+    # --------- modelo PPO ----------
     net_arch = [int(x) for x in args.net_arch.split(",") if x.strip()]
     model = PPO(
         policy="MlpPolicy",
@@ -55,20 +68,29 @@ def main():
         verbose=1,
         gamma=args.gamma,
         ent_coef=args.ent_coef,
-        policy_kwargs=dict(net_arch=net_arch))
+        learning_rate=args.lr,
+        n_steps=args.n_steps,
+        batch_size=args.batch_size,
+        n_epochs=args.n_epochs,
+        # puedes dejar clip_range/gae_lambda en defaults si no los expones por CLI
+        policy_kwargs=dict(net_arch=net_arch),
+        use_sde=use_sde_flag,          # <- quedará False en discreto
+        sde_sample_freq=getattr(args, "sde_sample_freq", -1),
+    )
 
-    # ---------- Entrenar ----------
+    # --------- entrenar ----------
     model.learn(total_timesteps=int(args.timesteps), progress_bar=True)
 
-    # Guardar
+    # --------- guardar ----------
     os.makedirs("models", exist_ok=True)
     model_path = f"models/pacman_ppo_{args.obs_mode}_seed{args.seed}.zip"
-    vecnorm_path = f"models/vecnorm_{args.obs_mode}_seed{args.seed}.pkl"
-
     model.save(model_path)
+
+    # MUY IMPORTANTE: guardar estadísticas de normalización
+    vecnorm_path = f"models/vecnorm_{args.obs_mode}_seed{args.seed}.pkl"
     vec.save(vecnorm_path)
 
-    # ---------- Guardar info del run ----------
+    # guardamos metadatos del run
     stamp = time.strftime("%Y%m%d-%H%M%S")
     os.makedirs("experiments/runs", exist_ok=True)
     info_path = f"experiments/runs/ppo_{args.obs_mode}_seed{args.seed}_{stamp}_run_info.json"
@@ -80,21 +102,21 @@ def main():
             "seed": args.seed,
             "gamma": args.gamma,
             "ent_coef": args.ent_coef,
+            "lr": args.lr,
             "net_arch": net_arch,
-            "vecnormalize": {
-                "norm_obs": args.norm_obs,
-                "norm_reward": args.norm_reward,
-                "clip_obs": args.clip_obs,
-                "clip_reward": args.clip_reward,
-                "stats_path": vecnorm_path,
-            },
+            "n_envs": args.n_envs,
+            "n_steps": args.n_steps,
+            "batch_size": args.batch_size,
+            "n_epochs": args.n_epochs,
             "model_path": model_path,
-            "run_info": info_path,
+            "vecnorm_path": vecnorm_path,
+            "run_info": info_path
         }, f, indent=2)
 
     print("✅ Entrenamiento listo:", model_path)
-    print("✅ VecNormalize guardado en:", vecnorm_path)
-    print("ℹ️  run_info:", info_path)
+    print("   VecNormalize guardado en:", vecnorm_path)
+    # cerrar procesos limpios
+    vec.close()
 
 if __name__ == "__main__":
     main()
