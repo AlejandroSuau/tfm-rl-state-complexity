@@ -78,6 +78,10 @@ class SimplePacmanEnv(gym.Env):
             self.grid[self.player_pos] = EMPTY
             self.coins_remaining -= 1
 
+            threshold = max(4, int(0.10 * self.coins_total))
+            if self.coins_remaining <= threshold:
+                reward += self.rewards.get("last_coin_bonus", 0.0)
+
         # --- Collect power pellet ---
         if self.grid[self.player_pos] == POWER:
             reward += self.rewards["power"]

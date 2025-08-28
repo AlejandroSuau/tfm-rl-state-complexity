@@ -31,5 +31,6 @@ DEFAULT_REWARDS = {
     "power_tick": 0.0,
     # Un pequeño empujón extra si pillas moneda en power (pero pequeño)
     "coin_power_bonus": 0.25,
+    "last_coin_bonus": 4.0,
 }
 
