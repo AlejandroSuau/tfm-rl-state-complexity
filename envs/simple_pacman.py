@@ -133,7 +133,8 @@ class SimplePacmanEnv(gym.Env):
             if self.cfg.mode == "power_time":
                 dim += 1
             if self.cfg.mode == "coins_quadrants":
-                dim += 4
+                dim += 4 # 4 dim for count of coins in each quadrant
+                dim += 4 # 4 dim for pacman quadrant
             self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(dim,), dtype=np.float32)
 
         self.action_space = spaces.Discrete(5)  # up, down, left, right, no-op
@@ -252,8 +253,23 @@ class SimplePacmanEnv(gym.Env):
             v.append(self.power_timer / max(1, self.cfg.power_duration))
         if self.cfg.mode == "coins_quadrants":
             v.extend(self._coins_by_quadrant())
+            v.extend(self._pacman_quandrant())
 
         return np.asarray(v, dtype=np.float32)
+
+    def _pacman_quandrant(self) -> List[float]:
+        """One-hot quadrant where player is"""
+        h, w = self.cfg.grid_size
+        midy, midx = h // 2, w // 2
+        y, x = self.player_pos
+        if y < midy and x < midx:
+            return [1.0, 0.0, 0.0, 0.0] # Q1
+        elif y < midy and x >= midx:
+            return [0.0, 1.0, 0.0, 0.0] # Q2
+        elif y >= midy and x < midx:
+            return [0.0, 0.0, 1.0, 0.0] # Q3
+        else:
+            return [0.0, 0.0, 0.0, 1.0] # Q4
 
     def _info(self) -> Dict[str, int]:
         """Extra diagnostic info returned with each step."""
