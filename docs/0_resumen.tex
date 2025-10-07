@@ -1,0 +1,105 @@
+\hypersetup{pageanchor=false}
+\pagenumbering{roman} 
+\setcounter{page}{1} 
+\pagestyle{plain}
+
+%%%%%%%%%%%%%%%%
+%%% CREDITOS %%%
+%%%%%%%%%%%%%%%%
+\chapter*{Créditos/Copyright}
+
+Una página con la especificación de créditos/copyright para el proyecto (ya sea aplicación por un lado y documentación por el otro, o unificadamente), así como la del uso de marcas, productos o servicios de terceros (incluidos códigos fuente). Si una persona diferente al autor colaboró en el proyecto, tiene que quedar explicitada su identidad y qué hizo.
+
+A continuación se ejemplifica el caso más habitual, aunque se puede modificar por cualquier otra alternativa:
+
+\vspace{1cm}
+
+\begin{figure}[ht]
+    \centering
+	\includegraphics[scale=1]{images/license.png}
+\end{figure}
+
+Esta obra está sujeta a una licencia de Reconocimiento -  NoComercial - SinObraDerivada
+
+\href{https://creativecommons.org/licenses/by-nc-nd/3.0/es/}{3.0 España de CreativeCommons}.
+
+%%%%%%%%%%%%%
+%%% FICHA %%%
+%%%%%%%%%%%%%
+\chapter*{FICHA DEL TRABAJO FINAL}
+
+\begin{table}[ht]
+	\centering{}
+	\renewcommand{\arraystretch}{2}
+	\begin{tabular}{r | l}
+		\hline
+		Título del trabajo: & Impacto de la complejidad de las observaciones en el rendimiento de algoritmos de Aprendizaje por Refuerzo en un entorno Pacman\\
+		\hline
+        Nombre del autor: & Alejandro Suau Ruiz\\
+		\hline
+        Nombre del colaborador/a docente: & Marc Borras Camarasa\\
+		\hline
+        Nombre del PRA: & David Masip Rodó\\
+		\hline
+        Fecha de entrega (mm/aaaa): & 01/2026\\
+		\hline
+        Titulación o programa: & Máster Universitario de Data Science\\
+		\hline
+        Área del Trabajo Final: & Reinforced Learning\\
+		\hline
+        Idioma del trabajo: & Español\\
+		\hline
+        Palabras clave & Aprendizaje por refuerzo, Complejidad del estado, Pacman\\
+		\hline
+	\end{tabular}
+\end{table}
+
+%%%%%%%%%%%%%%%%%%%
+%%% DEDICATORIA %%%
+%%%%%%%%%%%%%%%%%%%
+\chapter*{Dedicatoria/Cita}
+
+Breves palabras de dedicatoria y/o una cita.
+
+%%%%%%%%%%%%%%%%%%%
+%%% Agradecimientos %%%
+%%%%%%%%%%%%%%%%%%%
+\chapter*{Agradecimientos}
+
+Si se considera oportuno, mencionar a las personas, empresas o instituciones que hayan contribuido en la realización de este proyecto.
+
+%%%%%%%%%%%%%%%%
+%%% ABSTRACT%%%
+%%%%%%%%%%%%%%%%
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+\onehalfspacing
+
+This work investigates how the complexity of state representation affects the performance of reinforcement learning algorithms in a simplified Pacman environment. The central idea is that an agent’s success depends not only on the algorithm itself but also on the quality and richness of the information it receives from the environment. To analyze this, we designed a set of progressively more complex observation spaces, ranging from the basic positions of the player and the ghost to configurations that include the presence and duration of power-ups and the distribution of coins across quadrants.
+Experiments were carried out using widely adopted algorithms such as PPO, A2C, and DQN, implemented with the Stable-Baselines3 library. Controlled training with different random seeds and consistent performance metrics allowed us to compare both learning speed and the stability of the learned policies.
+The results show that increasing state complexity does not always lead to better performance: in some cases, the additional information introduces noise and hinders convergence. However, for specific configurations, the agent was able to exploit the extra information to achieve more robust behavior.
+In conclusion, the project highlights the importance of observation design in the success of reinforcement learning agents, stressing the need to balance simplicity and expressiveness depending on the task and the chosen algorithm.
+
+\vspace{1.5cm}
+
+\textbf{Keywords}: Reinforcement learning, State complexity, Pacman, Stable-Baselines3, Gymnasium
+
+%%%%%%%%%%%%%%%%
+%%% RESUMEN    %%%
+%%%%%%%%%%%%%%%%
+
+\chapter*{Resumen}
+\addcontentsline{toc}{chapter}{Resumen}
+
+\onehalfspacing
+
+Este trabajo explora cómo la complejidad de la representación del estado influye en el rendimiento de los algoritmos de aprendizaje por refuerzo en un entorno simplificado de Pacman. Partimos de la premisa de que un agente no aprende únicamente por el algoritmo empleado, sino también por la calidad y la riqueza de la información que percibe del entorno. Para analizarlo, hemos diseñado un conjunto de observaciones progresivamente más complejas, desde la posición básica de jugador y fantasma, hasta configuraciones que incluyen la presencia y duración de comodines o la distribución de monedas por cuadrantes.
+La experimentación se ha llevado a cabo con algoritmos ampliamente utilizados, como PPO, A2C y DQN, implementados con la librería Stable-Baselines3. Se han realizado entrenamientos controlados con semillas distintas y métricas de rendimiento homogéneas, lo que ha permitido comparar tanto la velocidad de aprendizaje como la estabilidad de las políticas aprendidas.
+Los resultados muestran que un aumento en la complejidad del estado no garantiza siempre un mejor desempeño: en ciertos casos, la mayor riqueza de información introduce ruido y dificulta la convergencia. Sin embargo, para determinadas configuraciones el agente logra aprovechar la información adicional y alcanzar un comportamiento más robusto.
+En conclusión, el proyecto confirma la relevancia del diseño de observaciones en el éxito de un agente de aprendizaje por refuerzo, subrayando la necesidad de equilibrar simplicidad y expresividad en función del objetivo y del algoritmo empleado.
+
+
+\vspace{1.5cm}
+
+\textbf{Palabras clave}: Aprendizaje por refuerzo, Complejidad del estado, Pacman, Stable-Baselines3, Gymnasium
