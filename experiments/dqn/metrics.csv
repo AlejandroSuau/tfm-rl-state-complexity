@@ -1,0 +1,9 @@
+algo,obs_mode,seed,episodes,mean_reward,std_reward,mean_len,success_rate,completion_ratio,near_clear_rate,model_path,vecnorm_used
+dqn,bool_power,0,100,-47.61060221944004,41.82476905940588,210.06,0.0,0.4959375,0.02,models\pacman_dqn_bool_power_seed0.zip,yes
+dqn,bool_power,1,100,-26.071801864616575,53.03421511926316,300.18,0.0,0.61609375,0.11,models\pacman_dqn_bool_power_seed1.zip,yes
+dqn,coins_quadrants,0,100,-72.00930212222039,19.961258106702363,114.93,0.0,0.32953125,0.0,models\pacman_dqn_coins_quadrants_seed0.zip,yes
+dqn,coins_quadrants,1,100,-77.18620212741196,18.094513934859272,90.62,0.0,0.2675,0.0,models\pacman_dqn_coins_quadrants_seed1.zip,yes
+dqn,minimal,0,100,-48.76930179774761,43.046555663042156,257.93,0.0,0.505625,0.01,models\pacman_dqn_minimal_seed0.zip,yes
+dqn,minimal,1,100,-53.810701959840955,34.38366640861722,208.07,0.0,0.52296875,0.06,models\pacman_dqn_minimal_seed1.zip,yes
+dqn,power_time,0,100,-39.90460192045197,50.36103397252709,261.46,0.0,0.52671875,0.03,models\pacman_dqn_power_time_seed0.zip,yes
+dqn,power_time,1,100,-77.8068021970801,18.949945440543864,128.68,0.0,0.24890625,0.0,models\pacman_dqn_power_time_seed1.zip,yes
