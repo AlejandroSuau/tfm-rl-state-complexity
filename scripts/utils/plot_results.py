@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -9,6 +8,7 @@ import pandas as pd
 METRICS_CSV = "experiments/metrics.csv"
 OUT_DIR = "experiments"
 
+ORDER = ["minimal", "bool_power", "power_time", "coins_quadrants"]
 
 def barplot(df: pd.DataFrame, metric: str, out_png: str, ylabel: str) -> None:
     """
@@ -20,15 +20,20 @@ def barplot(df: pd.DataFrame, metric: str, out_png: str, ylabel: str) -> None:
       - default Matplotlib styling
       - same labels, title, rotation, and dpi
     """
+    df2 = df.copy()
+    if "obs_mode" in df2.columns:
+        cat = pd.Categorical(df2["obs_mode"], categories=ORDER, ordered=True)
+        df2 = df2.assign(obs_mode=cat)
+
     grouped = (
-        df.groupby("obs_mode")[metric]
+        df2.groupby("obs_mode", observed=True)[metric]
         .mean()
+        .reindex(ORDER)  # mantiene el orden aunque falten categorías
         .reset_index()
-        .sort_values(by=metric, ascending=False)
     )
 
     plt.figure()
-    plt.bar(grouped["obs_mode"], grouped[metric])
+    plt.bar(grouped["obs_mode"].astype(str), grouped[metric])
     plt.ylabel(ylabel)
     plt.xlabel("obs_mode")
     plt.title(metric)
