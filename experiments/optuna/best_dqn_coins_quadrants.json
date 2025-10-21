@@ -1,0 +1,21 @@
+{
+  "algo": "dqn",
+  "obs_mode": "coins_quadrants",
+  "timesteps_per_trial": 200000,
+  "best_value": -46.210002375021574,
+  "best_params": {
+    "lr": 8.560080224506082e-05,
+    "gamma": 0.9221409801622686,
+    "ent_coef": 0.000684738794498319,
+    "net_arch": "128,128",
+    "buffer_size": 500000,
+    "learning_starts": 5000,
+    "batch_size": 512,
+    "train_freq": 1,
+    "gradient_steps": 4,
+    "target_update_interval": 500,
+    "exploration_fraction": 0.4862537825603318,
+    "exploration_final_eps": 0.03648748477675753,
+    "frame_stack": 4
+  }
+}

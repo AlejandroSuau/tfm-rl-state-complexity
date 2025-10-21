@@ -1,0 +1,15 @@
+{
+  "algo": "ppo",
+  "obs_mode": "minimal",
+  "timesteps_per_trial": 200000,
+  "best_value": 1.5492201787652449,
+  "best_params": {
+    "lr": 0.0001976963350416303,
+    "gamma": 0.9052794384279935,
+    "ent_coef": 0.0007293858960279276,
+    "net_arch": "128,128",
+    "n_steps": 512,
+    "batch_factor": 8,
+    "n_epochs": 8
+  }
+}
