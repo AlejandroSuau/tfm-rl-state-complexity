@@ -105,6 +105,8 @@ def main() -> None:
         "timesteps": args.timesteps,
         "model_path": model_path,
         "vecnorm_path": vecnorm_path,
+        "frame_stack": args.frame_stack,
+        "vecnorm": int(bool(args.vecnorm))
     }
     with open(
         f"experiments/runs/dqn_{args.obs_mode}_seed{args.seed}_{stamp}.json", "w"
