@@ -1,0 +1,109 @@
+\chapter{Planificación del proyecto}
+
+\section{Recursos necesarios}
+
+A continuación se detallan los recursos técnicos, de software y humanos requeridos para el desarrollo del proyecto. La selección de estos recursos se ha realizado considerando la naturaleza computacional del trabajo y la necesidad de garantizar reproducibilidad y eficiencia durante el proceso experimental.
+
+\begin{longtable}{>{\bfseries}p{3.5cm} p{10cm}}
+Tipo de recurso & Descripción \\ \hline
+Hardware & Ordenador personal con CPU multinúcleo (Intel i7 o equivalente), 16 GB de RAM y GPU NVIDIA opcional para acelerar el entrenamiento de redes neuronales. \\
+Software & Sistema operativo Linux/Windows, Python 3.10+, librerías \textit{Gymnasium}, \textit{Stable-Baselines3}, \textit{NumPy}, \textit{Matplotlib} y \textit{TensorBoard} para la monitorización de entrenamientos. \\
+Control de versiones & Repositorio privado en GitHub para gestionar código, scripts y documentación. \\
+Datos y experimentos & No se requieren datasets externos: los datos se generan de forma simulada a través del entorno \texttt{SimplePacmanEnv}. \\
+Apoyo académico & Tutorías con el tutor del TFM y revisión periódica según las fases definidas en las PEC. \\
+\end{longtable}
+
+\section{Planificación temporal y tareas}
+
+El proyecto se organiza siguiendo las fases de los módulos del TFM (de M1 a M5), que marcan los hitos principales de evaluación continua. Cada fase combina tareas de análisis, desarrollo y documentación.
+
+\begin{longtable}{|>{\bfseries}p{3cm}|p{2.8cm}|p{7.8cm}|p{2.8cm}|}
+\hline
+Fase / Módulo & Periodo aproximado & Descripción de tareas principales & Hito asociado \\
+\hline
+M1 -- Definición y planificación del TFM & 25 sep -- 12 oct 2025 & 
+\begin{itemize}
+\item Definir objetivos y alcance del proyecto.
+\item Revisar la viabilidad técnica y ética.
+\item Elaborar propuesta inicial y planificación.
+\end{itemize} & Entrega M1 (12 oct) \\ \hline
+
+M2 -- Estado del arte y fundamentos teóricos & 13 oct -- 2 nov 2025 &
+\begin{itemize}
+\item Revisión bibliográfica sobre aprendizaje por refuerzo, entornos Gym y algoritmos A2C, PPO y DQN.
+\item Identificación de trabajos similares y justificación del enfoque experimental.
+\end{itemize} & Entrega M2 (2 nov) \\ \hline
+
+M3 -- Diseño e implementación del sistema & 3 nov -- 14 dic 2025 &
+\begin{itemize}
+\item Implementar el entorno \texttt{SimplePacmanEnv}.
+\item Desarrollar scripts de entrenamiento (\texttt{train\_a2c.py}, \texttt{train\_ppo.py}, \texttt{train\_dqn.py}).
+\item Validar funcionalidad y reproducibilidad.
+\item Documentar el código.
+\end{itemize} & Entrega M3 (14 dic) \\ \hline
+
+M4 -- Redacción y análisis de resultados & 22 dic -- 28 dic 2025 &
+\begin{itemize}
+\item Entrenar los modelos con distintas configuraciones de observación.
+\item Analizar resultados y elaborar gráficas comparativas.
+\item Redactar la memoria y preparar la presentación audiovisual.
+\end{itemize} & Entrega M4 (21--28 dic); vídeo: 6 ene 2026 \\ \hline
+
+M5 -- Defensa y cierre del proyecto & 9 ene -- 30 ene 2026 &
+\begin{itemize}
+\item Entrega final de la documentación al tribunal.
+\item Presentación y defensa pública del trabajo.
+\item Revisión y cierre de la memoria.
+\end{itemize} & Entrega y defensa (9--30 ene) \\ \hline
+\end{longtable}
+
+\section{Diagrama de Gantt simplificado}
+
+El diagrama de Gantt que se presenta a continuación resume de forma visual la distribución temporal de las actividades y su solapamiento a lo largo del semestre académico. Cada marca indica aproximadamente una semana de dedicación dentro del mes correspondiente.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|>{\bfseries}p{6cm}|c|c|c|c|c|c|}
+\hline
+Actividad / Mes & Sep & Oct & Nov & Dic & Ene & Feb \\
+\hline
+Definición y planificación (M1) & XX & X &  &  &  &  \\
+\hline
+Estado del arte (M2) &  & XXX &  &  &  &  \\
+\hline
+Diseño e implementación (M3) &  & X & XXXX & X &  &  \\
+\hline
+Análisis y redacción (M4) &  &  &  & XXX & X &  \\
+\hline
+Defensa y cierre (M5) &  &  &  &  & XXX & X \\
+\hline
+\end{tabular}
+\end{center}
+
+\noindent
+\textit{Nota:} cada ``X'' representa aproximadamente una semana de trabajo dentro del mes correspondiente.
+
+
+\section{Hitos principales del proyecto}
+
+Finalmente, se resumen los hitos más relevantes del proyecto, vinculados a las Pruebas de Evaluación Continua (PEC) y a las entregas oficiales del calendario académico. Estos hitos marcan los puntos de control que estructuran el avance del trabajo desde su definición inicial hasta la defensa final.
+
+\begin{longtable}{|>{\bfseries}p{2.8cm}|p{3cm}|p{9cm}|}
+\hline
+Hito & Fecha aproximada & Descripción \\
+\hline
+H1 -- Definición del TFM (PEC1) & 12 oct 2025 & Entrega del documento de definición y planificación del TFM. \\ \hline
+H2 -- Estado del arte (PEC2) & 2 nov 2025 & Entrega del marco teórico y análisis del contexto del trabajo. \\ \hline
+H3 -- Implementación (PEC3) & 14 dic 2025 & Finalización del entorno funcional y de los scripts de entrenamiento. \\ \hline
+H4 -- Redacción preliminar y final (PEC4) & 21--28 dic 2025 & Entrega del documento completo del TFM y del vídeo de presentación. \\ \hline
+H5 -- Defensa final (PEC5) & 30 ene 2026 & Presentación pública y defensa del trabajo ante el tribunal. \\ \hline
+\end{longtable}
+
+
+\section{Resumen de los productos del proyecto}
+
+No es necesario describir cada producto en detalle: esto se hará en los capítulos restantes del proyecto.
+
+\section{Breve descripción de los demás capítulos del informe}
+
+Breve descripción de los contenidos de cada capítulo y su relación con el resto del proyecto.

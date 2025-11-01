@@ -1,0 +1,82 @@
+\chapter{Estado del arte}
+
+\section{Fundamentos del Aprendizaje por Refuerzo}
+
+El \textit{Aprendizaje por Refuerzo} (Reinforcement Learning, RL) constituye una de las ramas más relevantes del aprendizaje automático orientadas a la toma de decisiones secuenciales bajo incertidumbre. En este paradigma, un agente interactúa con un entorno mediante un proceso de prueba y error, buscando maximizar una recompensa acumulada a largo plazo. Formalmente, este proceso se modela como un \textit{Proceso de Decisión de Markov} (MDP), definido por el conjunto $(S, A, P, R, \gamma)$, donde $S$ representa el espacio de estados, $A$ el conjunto de acciones posibles, $P(s'|s,a)$ la función de transición de estados, $R(s,a)$ la función de recompensa y $\gamma \in [0,1]$ el factor de descuento que pondera la importancia de las recompensas futuras \citep{SuttonBarto2018}.
+
+El objetivo de un agente es encontrar una política óptima $\pi^*(a|s)$ que maximice el retorno esperado:
+
+\begin{equation}
+G_t = \mathbb{E}\left[\sum_{k=0}^{\infty} \gamma^k r_{t+k+1}\right],
+\end{equation}
+
+donde $r_{t+k+1}$ representa la recompensa obtenida $k$ pasos después del tiempo $t$.  
+A diferencia del aprendizaje supervisado, el RL no dispone de un conjunto fijo de ejemplos etiquetados: el conocimiento se adquiere mediante la experiencia directa con el entorno.  
+
+Los algoritmos de RL pueden clasificarse en dos grandes familias.  
+Los \textbf{métodos basados en valor} estiman la utilidad esperada de los estados o pares estado–acción a través de funciones $V(s)$ o $Q(s,a)$, como en los algoritmos Q-Learning o SARSA.  
+Por otro lado, los \textbf{métodos basados en política} parametrizan directamente la política $\pi_\theta(a|s)$ mediante un modelo (típicamente una red neuronal) y optimizan sus parámetros $\theta$ a partir del gradiente de la recompensa esperada.  
+La combinación de ambos enfoques da lugar a los métodos \textbf{actor-crítico}, donde un componente (\textit{crítico}) estima el valor de los estados y otro (\textit{actor}) actualiza la política en función de dicha estimación.
+
+En este marco, la \textbf{definición del estado} $s_t$ es un factor determinante.  
+La información que el agente percibe condiciona su capacidad para generalizar, explorar y aprender políticas efectivas. Una representación excesivamente simple puede ocultar detalles relevantes del entorno, mientras que una observación demasiado compleja puede introducir ruido, ralentizar la convergencia y requerir redes de mayor capacidad.  
+Por ello, la \textbf{complejidad del estado observado} constituye una variable crítica para la eficiencia del aprendizaje, y su análisis es el eje central del presente trabajo.
+
+\vspace{0.5em}
+
+\section{Avances en Deep Reinforcement Learning}
+
+La integración del aprendizaje por refuerzo con redes neuronales profundas dio lugar al \textit{Aprendizaje por Refuerzo Profundo} (Deep Reinforcement Learning, DRL), que permite aproximar funciones de valor o políticas directamente a partir de observaciones de alta dimensión, como imágenes o secuencias temporales.  
+Este enfoque ha sido clave para ampliar el alcance del RL a entornos complejos donde las representaciones manuales del estado resultan inviables \citep{Mnih2015}.
+
+El punto de inflexión en la historia del DRL se produjo con el algoritmo \textbf{Deep Q-Network (DQN)} desarrollado por Mnih et al. \citeyearpar{Mnih2015}, que combinó Q-Learning con redes convolucionales para aprender directamente a partir de píxeles en entornos Atari.  
+Entre sus principales innovaciones destacan dos mecanismos fundamentales:  
+(1) el \textit{Experience Replay}, que almacena transiciones $(s,a,r,s')$ y las reutiliza en mini-lotes aleatorios para romper la correlación temporal entre muestras, y  
+(2) la \textit{Target Network}, una red secundaria que se actualiza con menor frecuencia y estabiliza el aprendizaje.  
+DQN demostró por primera vez que un agente podía alcanzar rendimientos comparables a los humanos en una variedad de videojuegos, marcando el inicio del auge del DRL.
+
+A partir de DQN surgieron numerosas variantes orientadas a mejorar la estabilidad y eficiencia, como \textit{Double DQN}, \textit{Dueling DQN} o \textit{Rainbow DQN}, que integran mecanismos de priorización de experiencias, ponderación de ventajas o combinación de aprendizajes multiobjetivo.  
+Sin embargo, estos métodos basados en valor presentan limitaciones en espacios de acción continuos, donde la búsqueda discreta de la acción óptima resulta impracticable.
+
+Para abordar esas limitaciones, se desarrollaron los \textbf{métodos actor-crítico}, que combinan la estimación de valor y la política en un mismo marco.  
+Uno de los más representativos es el \textit{Advantage Actor-Critic (A2C)}, versión síncrona del A3C (\textit{Asynchronous Advantage Actor-Critic}) \citep{Mnih2016}.  
+En A2C, varios agentes ejecutan episodios en paralelo compartiendo una política común, lo que reduce la varianza del gradiente y acelera la convergencia.  
+La estimación de la ventaja $A(s,a) = Q(s,a) - V(s)$ permite medir cuánto mejor resulta ejecutar una acción respecto a la media de acciones posibles en un estado dado.
+
+Posteriormente, Schulman et al. \citeyearpar{Schulman2017} introdujeron el algoritmo \textbf{Proximal Policy Optimization (PPO)}, que se consolidó como uno de los métodos más utilizados por su equilibrio entre simplicidad y robustez.  
+PPO limita el cambio de la política mediante una función de recorte (\textit{clipping}) que evita actualizaciones excesivas, garantizando una mejora estable y controlada.  
+Su implementación eficiente en librerías como Stable-Baselines3 \citep{Raffin2021} ha favorecido su adopción tanto en investigación como en aplicaciones prácticas.
+
+En síntesis, DQN, A2C y PPO representan tres paradigmas complementarios del DRL:  
+\begin{itemize}
+    \item \textbf{DQN:} aprendizaje basado en valor, idóneo para espacios de acción discretos, pero sensible a la estructura de la observación.  
+    \item \textbf{A2C:} enfoque actor-crítico que equilibra exploración y estabilidad mediante aprendizaje paralelo.  
+    \item \textbf{PPO:} optimización de políticas próximas, robusta ante variaciones en la dimensionalidad del estado.  
+\end{itemize}
+
+Estas características los convierten en candidatos idóneos para analizar de forma comparativa cómo la \textbf{complejidad de la observación} afecta el rendimiento del aprendizaje, manteniendo constante la dinámica y la recompensa del entorno.  
+
+\vspace{0.5em}
+
+\section{Síntesis y vacíos detectados}
+
+La revisión de la literatura evidencia que, aunque el Aprendizaje por Refuerzo Profundo ha experimentado avances notables en la última década, gran parte de los esfuerzos se ha centrado en la \textbf{optimización de los algoritmos} —ya sea mediante arquitecturas, estrategias de exploración o funciones de pérdida—, mientras que el impacto de la representación del estado ha recibido menor atención.  
+En la mayoría de los estudios, el espacio de observación se trata como una variable fija del entorno, sin evaluar de manera sistemática cómo su complejidad o riqueza informacional influye en la eficacia del aprendizaje.
+
+En respuesta a esta limitación, han surgido líneas de investigación como el \textit{State Representation Learning} (SRL), que busca aprender representaciones latentes más compactas y relevantes para la toma de decisiones \citep{Lesort2018,Ha2018,Hafner2020}.  
+Estos trabajos utilizan modelos generativos o redes autoencoder para capturar información útil en espacios de menor dimensión, lo que facilita la generalización y reduce el coste computacional.  
+No obstante, la mayoría de enfoques SRL se orientan a la \textbf{construcción automática de representaciones} y no al estudio explícito del efecto de distintos niveles de complejidad observacional sobre el proceso de aprendizaje.
+
+De forma complementaria, los estudios sobre entornos parcialmente observables \citep{Hausknecht2015} han puesto de manifiesto cómo la falta de información puede limitar la convergencia y provocar políticas subóptimas.  
+Sin embargo, apenas existen análisis controlados sobre el efecto contrario: cómo el exceso de información o la redundancia en el estado pueden degradar el rendimiento o ralentizar la convergencia.  
+
+Los entornos más utilizados como \textit{benchmarks}, tales como Atari o MuJoCo, ofrecen espacios de observación fijos, lo que impide aislar experimentalmente esta variable.  
+En años recientes, entornos modulares como \textit{MiniGrid} \citep{ChevalierBoisvert2018} o \textit{ProcGen} \citep{Cobbe2020} han permitido cierta variabilidad estructural, aunque su propósito principal ha sido evaluar la capacidad de generalización entre tareas, no la complejidad del estado como tal.
+
+En este contexto, se identifica un vacío experimental relevante: la ausencia de estudios que analicen de forma controlada la relación entre la \textbf{complejidad del espacio de observación} y el rendimiento de distintos algoritmos de RL manteniendo constantes las dinámicas, recompensas y reglas del entorno.  
+
+El presente trabajo busca contribuir a llenar ese vacío mediante el desarrollo de un entorno propio, \textit{SimplePacmanEnv}, inspirado en el clásico juego Pac-Man.  
+Dicho entorno permite parametrizar el nivel de información observable, desde representaciones mínimas (posición del agente y del fantasma) hasta configuraciones enriquecidas con comodines, distribución de monedas o vistas tipo imagen.  
+Esta configuración experimental posibilita evaluar empíricamente cómo la cantidad y naturaleza de la información percibida influyen en la estabilidad del entrenamiento, la velocidad de convergencia y la calidad final de la política aprendida.
+
+En conjunto, este análisis pretende aportar una visión empírica y reproducible sobre el equilibrio entre \textbf{simplicidad y expresividad} en el diseño de observaciones, contribuyendo así a una comprensión más profunda del papel de la percepción en el rendimiento de los agentes de aprendizaje por refuerzo.
