@@ -128,13 +128,16 @@ class SimplePacmanEnv(gym.Env):
             self.observation_space = spaces.Box(low=0, high=1, shape=(h, w, 5), dtype=np.uint8)
         else:
             dim = 4  # player(x,y), ghost(x,y)
-            if self.cfg.mode in {"bool_power", "power_time"}:
-                dim += 1
-            if self.cfg.mode == "power_time":
-                dim += 1
+            if self.cfg.mode in {"bool_power", "power_time", "coins_quadrants"}:
+                dim += 1 # bool power actie
+            
+            if self.cfg.mode in {"power_time", "coins_quadrants"}:
+                dim += 1 # power time (left time / duration)
+            
             if self.cfg.mode == "coins_quadrants":
                 dim += 4 # 4 dim for count of coins in each quadrant
                 dim += 4 # 4 dim for pacman quadrant
+            
             self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(dim,), dtype=np.float32)
 
         self.action_space = spaces.Discrete(5)  # up, down, left, right, no-op
@@ -247,10 +250,12 @@ class SimplePacmanEnv(gym.Env):
         v.extend(self._norm_pos(self.player_pos))
         v.extend(self._norm_pos(self.ghost_pos))
 
-        if self.cfg.mode in {"bool_power", "power_time"}:
+        if self.cfg.mode in {"bool_power", "power_time", "coins_quadrants"}:
             v.append(float(self.power_timer > 0))
-        if self.cfg.mode == "power_time":
+        
+        if self.cfg.mode in {"power_time", "coins_quadrants"}:
             v.append(self.power_timer / max(1, self.cfg.power_duration))
+        
         if self.cfg.mode == "coins_quadrants":
             v.extend(self._coins_by_quadrant())
             v.extend(self._pacman_quandrant())
