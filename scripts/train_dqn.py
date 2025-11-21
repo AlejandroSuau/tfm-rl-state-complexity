@@ -5,6 +5,7 @@ import json
 import os
 import time
 from typing import Callable
+import torch
 
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
@@ -20,8 +21,17 @@ def make_env(obs_mode: str, seed: int) -> Callable[[], Monitor]:
     """
     return lambda: Monitor(SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed))
 
+def is_using_gpu() -> bool:
+    return torch.cuda.is_available()
 
 def main() -> None:
+    if (is_using_gpu()):
+        print(f"Is using GPU: ", torch.cuda.get_device_name(0))
+    else:
+        print("Care, you're not using GPU!")
+        print("Ending execution ...")
+        return
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--timesteps", type=int, default=1_000_000)
     ap.add_argument(
@@ -80,6 +90,7 @@ def main() -> None:
         gamma=args.gamma,
         policy_kwargs=policy_kwargs,
         verbose=1,
+        device="cuda"
     )
 
     model.learn(total_timesteps=int(args.timesteps), progress_bar=True)
