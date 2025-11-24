@@ -251,11 +251,33 @@ def main() -> None:
     ap.add_argument("--index", type=str, default="experiments/run_index.csv")
     ap.add_argument("--episodes", type=int, default=50)
     ap.add_argument("--out", type=str, default="experiments/metrics.csv")
+    
+    ap.add_argument("--algo", type=str, default="dqn",
+                    choices=["dqn", "ppo", "a2c", "all"],
+                    help="Filtrar por algoritmo (o 'all' para no filtrar)")
+    ap.add_argument("--seed-filter", type=int, default=None,
+                    help="Si se especifica, solo evalúa este seed")
+    ap.add_argument("--obs-mode-filter", type=str, default=None,
+                    help="Si se especifica, solo evalúa este modo de observación")
+    
     args = ap.parse_args()
 
     rows = parse_index_or_glob(args.index)
     if not rows:
         print("[WARN] No hay modelos. Ejecuta train_* primero.")
+        return
+
+    if args.algo != "all":
+        rows = [r for r in rows if r["algo"].lower() == args.algo.lower()]
+
+    if args.seed_filter is not None:
+        rows = [r for r in rows if int(r["seed"]) == args.seed_filter]
+
+    if args.obs_mode_filter is not None:
+        rows = [r for r in rows if r["obs_mode"] == args.obs_mode_filter]
+
+    if not rows:
+        print("[WARN] No hay modelos tras aplicar filtros.")
         return
 
     header = [
@@ -289,7 +311,7 @@ def main() -> None:
 
         vecnorm = maybe_vecnorm_path(r)
         # Heuristic: if no frame_stack in index, we use 4 only for coin_quadrants, otherwise 1.
-        fs_hint = int(r.get("frame_stack", 4 if (algo == "dqn" and obs_mode == "coins_quadrants") else 1))
+        fs_hint = int(r.get("frame_stack", 4 if algo == "dqn" else 1))
         print(f"[EVAL] {algo} | {obs_mode} | seed={seed} | vecnorm={'yes' if vecnorm else 'no'} | fs={fs_hint}")
 
         mean_r, std_r, mean_len, succ, mean_ratio, near_rate = evaluate_model(

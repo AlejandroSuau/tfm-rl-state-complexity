@@ -240,7 +240,68 @@ class SimplePacmanEnv(gym.Env):
         layers[self.player_pos][3] = 1
         layers[self.ghost_pos][4] = 1
         return layers
-    
+
+     # ---------- Render ----------
+    def render(self):
+        """
+        Renderiza el entorno según self.render_mode.
+        - 'ansi'      -> devuelve un string con el mapa en ASCII
+        - 'rgb_array' -> devuelve un array (H, W, 3) uint8 para usar con imshow
+        """
+        if self.render_mode is None:
+            raise NotImplementedError(
+                "SimplePacmanEnv: define render_mode='ansi' o 'rgb_array' al crear el entorno."
+            )
+
+        if self.render_mode == "ansi":
+            # Construimos una cuadricula de caracteres
+            h, w = self.grid.shape
+            lines = []
+            for y in range(h):
+                row_chars = []
+                for x in range(w):
+                    pos = (y, x)
+                    if pos == self.player_pos:
+                        ch = "C"  # Pacman
+                    elif pos == self.ghost_pos:
+                        ch = "G"  # Fantasma
+                    else:
+                        cell = self.grid[y, x]
+                        if cell == WALL:
+                            ch = "#"
+                        elif cell == COIN:
+                            ch = "."
+                        elif cell == POWER:
+                            ch = "P"
+                        else:
+                            ch = " "
+                    row_chars.append(ch)
+                lines.append("".join(row_chars))
+            return "\n".join(lines)
+
+        if self.render_mode == "rgb_array":
+            # Usamos las capas ya definidas para crear una imagen RGB sencilla
+            layers = self._render_layers()  # (H, W, 5)
+            h, w, _ = layers.shape
+            img = np.zeros((h, w, 3), dtype=np.uint8)
+
+            # Fondo negro por defecto
+            # Paredes -> gris
+            img[layers[:, :, 0] == 1] = (80, 80, 80)
+            # Monedas -> amarillo
+            img[layers[:, :, 1] == 1] = (255, 215, 0)
+            # Powers -> azul
+            img[layers[:, :, 2] == 1] = (0, 0, 255)
+            # Jugador -> amarillo brillante
+            img[layers[:, :, 3] == 1] = (255, 255, 0)
+            # Fantasma -> rojo
+            img[layers[:, :, 4] == 1] = (255, 0, 0)
+
+            return img
+
+        # Si se pide un modo que no soportamos
+        raise NotImplementedError(f"Render mode '{self.render_mode}' no soportado.")
+
     def _get_obs(self):
         """Build observation according to the configured mode."""
         if self.cfg.mode == "image":

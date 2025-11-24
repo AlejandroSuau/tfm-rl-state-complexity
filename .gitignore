@@ -40,3 +40,5 @@ data/
 
 .TODO
 entregas/
+models/checkpoints_*/
+logs/

@@ -10,6 +10,7 @@ import torch
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
+from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement, CheckpointCallback
 
 from envs.simple_pacman import ObsConfig, SimplePacmanEnv
 
@@ -21,17 +22,7 @@ def make_env(obs_mode: str, seed: int) -> Callable[[], Monitor]:
     """
     return lambda: Monitor(SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed))
 
-def is_using_gpu() -> bool:
-    return torch.cuda.is_available()
-
 def main() -> None:
-    if (is_using_gpu()):
-        print(f"Is using GPU: ", torch.cuda.get_device_name(0))
-    else:
-        print("Care, you're not using GPU!")
-        print("Ending execution ...")
-        return
-
     ap = argparse.ArgumentParser()
     ap.add_argument("--timesteps", type=int, default=1_000_000)
     ap.add_argument(
@@ -53,19 +44,42 @@ def main() -> None:
     ap.add_argument("--net-arch", type=str, default="256,256")
     ap.add_argument("--vecnorm", type=int, default=1)
     ap.add_argument("--frame-stack", type=int, default=4)
+    ap.add_argument(
+        "--early-stop",
+        type=int,
+        default=0,
+        help="0 = sin early stopping; >0 = nº de evaluaciones sin mejora antes de parar",
+    )
+    ap.add_argument(
+        "--eval-freq",
+        type=int,
+        default=50_000,
+        help="Frecuencia de evaluación (en steps de entorno)",
+    )
+    ap.add_argument(
+        "--n-eval-episodes",
+        type=int,
+        default=5,
+        help="Episodios por evaluación de early stopping",
+    )
 
     args = ap.parse_args()
 
     # DQN → use a single environment (most stable/robust setup).
     venv = DummyVecEnv([make_env(args.obs_mode, args.seed)])
 
+    # Entorno de evaluación (misma obs_mode, semilla distinta)
+    eval_env = DummyVecEnv([make_env(args.obs_mode, args.seed + 100)])
+
     # Optionally stack frames (default = 4).
     if args.frame_stack and args.frame_stack > 1:
         venv = VecFrameStack(venv, n_stack=args.frame_stack)
+        eval_env = VecFrameStack(eval_env, n_stack=args.frame_stack)
 
     # Normalize ONLY observations (not rewards, since DQN is off-policy).
     if args.vecnorm:
         venv = VecNormalize(venv, norm_obs=True, norm_reward=False, clip_obs=10.0)
+        eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
 
     obs = venv.reset()
     print(f"[DEBUG] obs_space={venv.observation_space} | reset_shape={obs.shape}")
@@ -90,19 +104,66 @@ def main() -> None:
         gamma=args.gamma,
         policy_kwargs=policy_kwargs,
         verbose=1,
-        device="cuda"
+        device="auto",
+        tensorboard_log="logs/tensorboard"
     )
 
-    model.learn(total_timesteps=int(args.timesteps), progress_bar=True)
+    algo = "dqn"
+    run_name = f"{algo}_{args.obs_mode}_seed{args.seed}"
+    base_model_dir = os.path.join("models", algo)
+    best_dir = os.path.join(base_model_dir, "best")
+    checkpoints_dir = os.path.join(base_model_dir, "checkpoints")
+    last_dir = os.path.join(base_model_dir, "last")
+    os.makedirs(best_dir, exist_ok=True)
+    os.makedirs(checkpoints_dir, exist_ok=True)
+    os.makedirs(last_dir, exist_ok=True)
+
+    if args.early_stop > 0:
+        # Callback que para si no hay mejora en la recompensa media
+        stop_cb = StopTrainingOnNoModelImprovement(
+            max_no_improvement_evals=args.early_stop,
+            min_evals=1,
+            verbose=1,
+        )
+
+        eval_cb = EvalCallback(
+            eval_env,
+            callback_after_eval=stop_cb,
+            eval_freq=args.eval_freq,
+            n_eval_episodes=args.n_eval_episodes,
+            best_model_save_path=os.path.join(best_dir, run_name),
+
+            log_path="logs/eval_dqn",
+            deterministic=True,
+        )
+        callback = eval_cb
+    else:
+        callback = None
+
+    checkpoint_callback = CheckpointCallback(
+        save_freq=50_000,  # guardar cada 50k pasos, ajustable
+        save_path=checkpoints_dir,
+        name_prefix=run_name
+    )
+
+    model.learn(
+        total_timesteps=int(args.timesteps),
+        progress_bar=True,
+        tb_log_name=run_name,
+        callback=[callback, checkpoint_callback]
+    )
 
     # Save model and VecNormalize state.
-    os.makedirs("models", exist_ok=True)
-    model_path = f"models/pacman_dqn_{args.obs_mode}_seed{args.seed}.zip"
+    model_path = os.path.join(last_dir, f"{run_name}.zip")
     model.save(model_path)
 
     if args.vecnorm:
-        vecnorm_path = f"models/vecnorm_{args.obs_mode}_seed{args.seed}_dqn.pkl"
+        vecnorm_path = os.path.join(last_dir, f"vecnorm_{run_name}.pkl")
         venv.save(vecnorm_path)
+
+        # Copia de vecnorm también junto al best model
+        best_vecnorm_path = os.path.join(best_dir, f"vecnorm_{run_name}.pkl")
+        venv.save(best_vecnorm_path)
     else:
         vecnorm_path = None
 
@@ -120,7 +181,7 @@ def main() -> None:
         "vecnorm": int(bool(args.vecnorm))
     }
     with open(
-        f"experiments/runs/dqn_{args.obs_mode}_seed{args.seed}_{stamp}.json", "w"
+        f"experiments/runs/{run_name}_{stamp}.json", "w"
     ) as f:
         json.dump(run_rec, f, indent=2)
 

@@ -1,0 +1,2 @@
+algo,obs_mode,seed,episodes,mean_reward,std_reward,mean_len,success_rate,completion_ratio,near_clear_rate,model_path,vecnorm_used
+dqn,coins_quadrants,0,100,-25.17140298873186,41.33488583258097,233.14,0.0,0.636875,0.16,models\pacman_dqn_coins_quadrants_seed0.zip,yes
