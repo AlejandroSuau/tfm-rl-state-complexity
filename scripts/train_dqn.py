@@ -10,7 +10,11 @@ import torch
 from stable_baselines3 import DQN
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecNormalize
-from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnNoModelImprovement, CheckpointCallback
+from stable_baselines3.common.callbacks import (
+    EvalCallback,
+    StopTrainingOnNoModelImprovement,
+    CheckpointCallback,
+)
 
 from envs.simple_pacman import ObsConfig, SimplePacmanEnv
 
@@ -21,6 +25,7 @@ def make_env(obs_mode: str, seed: int) -> Callable[[], Monitor]:
     Used for constructing vectorized environments.
     """
     return lambda: Monitor(SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed))
+
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -63,7 +68,22 @@ def main() -> None:
         help="Episodios por evaluación de early stopping",
     )
 
+    # Flags para continuar entrenamiento (alineado con PPO/A2C)
+    ap.add_argument(
+        "--continue-model",
+        type=str,
+        default="",
+        help="Ruta al modelo DQN (.zip) desde el que continuar el entrenamiento",
+    )
+    ap.add_argument(
+        "--continue-vecnorm",
+        type=str,
+        default="",
+        help="Ruta al VecNormalize (.pkl) desde el que continuar (debe coincidir con el modelo)",
+    )
+
     args = ap.parse_args()
+    continuing = bool(args.continue_model)
 
     # DQN → use a single environment (most stable/robust setup).
     venv = DummyVecEnv([make_env(args.obs_mode, args.seed)])
@@ -76,10 +96,36 @@ def main() -> None:
         venv = VecFrameStack(venv, n_stack=args.frame_stack)
         eval_env = VecFrameStack(eval_env, n_stack=args.frame_stack)
 
-    # Normalize ONLY observations (not rewards, since DQN is off-policy).
-    if args.vecnorm:
-        venv = VecNormalize(venv, norm_obs=True, norm_reward=False, clip_obs=10.0)
-        eval_env = VecNormalize(eval_env, norm_obs=True, norm_reward=False, clip_obs=10.0)
+    # ---------- Normalización (VecNormalize) ----------
+    # Casos:
+    #  - Si continue_vecnorm: cargar ese estado tanto en train como en eval.
+    #  - Si no, y vecnorm=1: crear VecNormalize nuevo.
+    #  - Si vecnorm=0 y sin continue_vecnorm: no normalizamos.
+    if args.continue_vecnorm:
+        # Cargar VecNormalize previo para entrenamiento
+        venv = VecNormalize.load(args.continue_vecnorm, venv)
+        venv.training = True
+        venv.norm_reward = False  # off-policy: no normalizamos reward
+
+        # Cargar VecNormalize también para eval, pero en modo evaluación
+        eval_env = VecNormalize.load(args.continue_vecnorm, eval_env)
+        eval_env.training = False
+        eval_env.norm_reward = False
+    else:
+        if args.vecnorm:
+            venv = VecNormalize(
+                venv,
+                norm_obs=True,
+                norm_reward=False,  # DQN es off-policy
+                clip_obs=10.0,
+            )
+            eval_env = VecNormalize(
+                eval_env,
+                norm_obs=True,
+                norm_reward=False,
+                clip_obs=10.0,
+            )
+            eval_env.training = False  # no actualizar estadísticas en eval
 
     obs = venv.reset()
     print(f"[DEBUG] obs_space={venv.observation_space} | reset_shape={obs.shape}")
@@ -88,25 +134,33 @@ def main() -> None:
     net_arch = [int(x) for x in args.net_arch.split(",") if x]
 
     policy_kwargs = dict(net_arch=net_arch)
-    model = DQN(
-        policy="MlpPolicy",
-        env=venv,
-        seed=args.seed,
-        learning_rate=args.lr,
-        buffer_size=args.buffer_size,
-        learning_starts=args.learning_starts,
-        batch_size=args.batch_size,
-        train_freq=args.train_freq,
-        gradient_steps=args.gradient_steps,
-        target_update_interval=args.target_update_interval,
-        exploration_fraction=args.exploration_fraction,
-        exploration_final_eps=args.exploration_final_eps,
-        gamma=args.gamma,
-        policy_kwargs=policy_kwargs,
-        verbose=1,
-        device="auto",
-        tensorboard_log="logs/tensorboard"
-    )
+
+    # ---------- Crear o cargar modelo ----------
+    if continuing:
+        if not args.continue_model:
+            raise ValueError("Se indicó continuar entrenamiento pero falta --continue-model")
+        print(f"[INFO] Continuando entrenamiento DQN desde modelo: {args.continue_model}")
+        model = DQN.load(args.continue_model, env=venv, device="auto")
+    else:
+        model = DQN(
+            policy="MlpPolicy",
+            env=venv,
+            seed=args.seed,
+            learning_rate=args.lr,
+            buffer_size=args.buffer_size,
+            learning_starts=args.learning_starts,
+            batch_size=args.batch_size,
+            train_freq=args.train_freq,
+            gradient_steps=args.gradient_steps,
+            target_update_interval=args.target_update_interval,
+            exploration_fraction=args.exploration_fraction,
+            exploration_final_eps=args.exploration_final_eps,
+            gamma=args.gamma,
+            policy_kwargs=policy_kwargs,
+            verbose=1,
+            device="auto",
+            tensorboard_log="logs/tensorboard",
+        )
 
     algo = "dqn"
     run_name = f"{algo}_{args.obs_mode}_seed{args.seed}"
@@ -117,6 +171,9 @@ def main() -> None:
     os.makedirs(best_dir, exist_ok=True)
     os.makedirs(checkpoints_dir, exist_ok=True)
     os.makedirs(last_dir, exist_ok=True)
+
+    # ---------- Callbacks: early stopping + checkpoints ----------
+    callbacks = []
 
     if args.early_stop > 0:
         # Callback que para si no hay mejora en la recompensa media
@@ -132,32 +189,32 @@ def main() -> None:
             eval_freq=args.eval_freq,
             n_eval_episodes=args.n_eval_episodes,
             best_model_save_path=os.path.join(best_dir, run_name),
-
             log_path="logs/eval_dqn",
             deterministic=True,
         )
-        callback = eval_cb
-    else:
-        callback = None
+        callbacks.append(eval_cb)
 
     checkpoint_callback = CheckpointCallback(
         save_freq=50_000,  # guardar cada 50k pasos, ajustable
         save_path=checkpoints_dir,
-        name_prefix=run_name
+        name_prefix=run_name,
     )
+    callbacks.append(checkpoint_callback)
 
+    # ---------- Entrenamiento ----------
     model.learn(
         total_timesteps=int(args.timesteps),
         progress_bar=True,
         tb_log_name=run_name,
-        callback=[callback, checkpoint_callback]
+        callback=callbacks if callbacks else None,
+        reset_num_timesteps=not continuing,
     )
 
-    # Save model and VecNormalize state.
+    # ---------- Guardar modelo y VecNormalize (last + best vecnorm) ----------
     model_path = os.path.join(last_dir, f"{run_name}.zip")
     model.save(model_path)
 
-    if args.vecnorm:
+    if isinstance(venv, VecNormalize):
         vecnorm_path = os.path.join(last_dir, f"vecnorm_{run_name}.pkl")
         venv.save(vecnorm_path)
 
@@ -167,7 +224,7 @@ def main() -> None:
     else:
         vecnorm_path = None
 
-    # Log run metadata in experiments/runs.
+    # ---------- Log de la ejecución ----------
     stamp = time.strftime("%Y%m%d-%H%M%S")
     os.makedirs("experiments/runs", exist_ok=True)
     run_rec = {
@@ -178,7 +235,20 @@ def main() -> None:
         "model_path": model_path,
         "vecnorm_path": vecnorm_path,
         "frame_stack": args.frame_stack,
-        "vecnorm": int(bool(args.vecnorm))
+        "vecnorm": int(isinstance(venv, VecNormalize)),
+        "lr": args.lr,
+        "gamma": args.gamma,
+        "buffer_size": args.buffer_size,
+        "learning_starts": args.learning_starts,
+        "batch_size": args.batch_size,
+        "train_freq": args.train_freq,
+        "gradient_steps": args.gradient_steps,
+        "target_update_interval": args.target_update_interval,
+        "exploration_fraction": args.exploration_fraction,
+        "exploration_final_eps": args.exploration_final_eps,
+        "net_arch": net_arch,
+        "continue_model": args.continue_model,
+        "continue_vecnorm": args.continue_vecnorm,
     }
     with open(
         f"experiments/runs/{run_name}_{stamp}.json", "w"
