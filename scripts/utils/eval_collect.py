@@ -37,41 +37,37 @@ def _calc_completion_ratio(
     return 1.0 - float(end_coins) / float(total_coins)
 
 
-def build_eval_env(algo: str, obs_mode: str, seed: int, vecnorm_path: str | None, frame_stack_dqn: int = 1):
+def build_eval_env(
+    algo: str,
+    obs_mode: str,
+    seed: int,
+    vecnorm_path: str | None,
+    frame_stack: int = 1,
+):
     """
-    If `vecnorm_path` exists => create DummyVecEnv(1) + load VecNormalize and disable training.
-    (Observations are normalized; rewards are NOT normalized to keep comparable metrics.)
+    Crea un entorno de evaluación que replica la tubería de entrenamiento:
+    SimplePacmanEnv -> Monitor -> DummyVecEnv -> (opcional) VecFrameStack -> (opcional) VecNormalize.
     """
-    base = DummyVecEnv(
-        [lambda: Monitor(SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed))]
-    )
+    def make_env():
+        return Monitor(SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed))
 
-    if algo.lower() == "dqn" and frame_stack_dqn and frame_stack_dqn > 1:
-        base = VecFrameStack(base, n_stack=frame_stack_dqn)
+    env = DummyVecEnv([make_env])
 
-    if vecnorm_path and os.path.exists(vecnorm_path):
-        venv = VecNormalize.load(vecnorm_path, base)
-        venv.training = False
-        venv.norm_reward = False
-        print(f"[INFO] VecNormalize cargado: {vecnorm_path}")
-        return venv
-    
-    base = DummyVecEnv([lambda: Monitor(SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed))])
-    env = base
-    if algo.lower() == "dqn" and frame_stack_dqn and frame_stack_dqn > 1:
-        env = VecFrameStack(env, n_stack=frame_stack_dqn)
-    
+    # 1) Frame stack si procede (para cualquier algoritmo)
+    if frame_stack and frame_stack > 1:
+        env = VecFrameStack(env, n_stack=frame_stack)
+
+    # 2) VecNormalize si hay .pkl
     if vecnorm_path and os.path.exists(vecnorm_path):
         try:
             env = VecNormalize.load(vecnorm_path, env)
             env.training = False
             env.norm_reward = False
             print(f"[INFO] VecNormalize cargado: {vecnorm_path}")
-            return env
         except AssertionError as e:
             print(f"[WARN] VecNormalize incompatible ({e}). Eval SIN normalizar.")
-
-    print("[WARN] Sin VecNormalize (.pkl no encontrado o incompatible). Eval sin normalizar -> rendimiento menor.")
+    else:
+        print("[WARN] Sin VecNormalize (.pkl no encontrado). Eval sin normalizar -> rendimiento menor.")
 
     return env
 
@@ -83,7 +79,7 @@ def evaluate_model(
     episodes: int,
     seed: int = 123,
     vecnorm_path: str | None = None,
-    frame_stack_dqn: int = 1,
+    frame_stack: int = 1,
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Evaluate a saved model for a given number of episodes, computing aggregate metrics.
@@ -91,7 +87,7 @@ def evaluate_model(
     Returns:
         mean_reward, std_reward, mean_len, success_rate, completion_ratio_mean, near_clear_rate
     """
-    env = build_eval_env(algo, obs_mode, seed, vecnorm_path, frame_stack_dqn)
+    env = build_eval_env(algo, obs_mode, seed, vecnorm_path, frame_stack)
     ModelCls = ALGOS[algo]
     model = ModelCls.load(model_path, env=env, device="cpu")
 
@@ -113,6 +109,7 @@ def evaluate_model(
             except Exception:
                 init_coins, total_coins = None, None
         else:
+            # Ruta no vecenv (poco probable en este script, pero la dejamos por compatibilidad)
             obs, info = env.reset(seed=seed + ep)
             init_coins = info.get("coins_remaining", None)
             total_coins = info.get("coins_total", None)
@@ -146,6 +143,7 @@ def evaluate_model(
                     success.append(1 if end_coins == 0 else 0)
                     break
             else:
+                # Ruta Gymnasium no vecenv
                 obs, r, terminated, truncated, info = env.step(int(action))
                 ep_r += float(r)
                 steps += 1
@@ -251,15 +249,27 @@ def main() -> None:
     ap.add_argument("--index", type=str, default="experiments/run_index.csv")
     ap.add_argument("--episodes", type=int, default=50)
     ap.add_argument("--out", type=str, default="experiments/metrics.csv")
-    
-    ap.add_argument("--algo", type=str, default="dqn",
-                    choices=["dqn", "ppo", "a2c", "all"],
-                    help="Filtrar por algoritmo (o 'all' para no filtrar)")
-    ap.add_argument("--seed-filter", type=int, default=None,
-                    help="Si se especifica, solo evalúa este seed")
-    ap.add_argument("--obs-mode-filter", type=str, default=None,
-                    help="Si se especifica, solo evalúa este modo de observación")
-    
+
+    ap.add_argument(
+        "--algo",
+        type=str,
+        default="dqn",
+        choices=["dqn", "ppo", "a2c", "all"],
+        help="Filtrar por algoritmo (o 'all' para no filtrar)",
+    )
+    ap.add_argument(
+        "--seed-filter",
+        type=int,
+        default=None,
+        help="Si se especifica, solo evalúa este seed",
+    )
+    ap.add_argument(
+        "--obs-mode-filter",
+        type=str,
+        default=None,
+        help="Si se especifica, solo evalúa este modo de observación",
+    )
+
     args = ap.parse_args()
 
     rows = parse_index_or_glob(args.index)
@@ -310,13 +320,21 @@ def main() -> None:
             continue
 
         vecnorm = maybe_vecnorm_path(r)
-        # Heuristic: if no frame_stack in index, we use 4 only for coin_quadrants, otherwise 1.
-        fs_hint = int(r.get("frame_stack", 4 if algo == "dqn" else 1))
-        print(f"[EVAL] {algo} | {obs_mode} | seed={seed} | vecnorm={'yes' if vecnorm else 'no'} | fs={fs_hint}")
+        # frame_stack viene del índice si está; si no, heurística:
+        fs_hint = int(r.get("frame_stack", 4 if algo == "dqn" or algo == "ppo" else 1))
+        print(
+            f"[EVAL] {algo} | {obs_mode} | seed={seed} | "
+            f"vecnorm={'yes' if vecnorm else 'no'} | fs={fs_hint}"
+        )
 
         mean_r, std_r, mean_len, succ, mean_ratio, near_rate = evaluate_model(
-            algo, model_path, obs_mode, episodes=args.episodes, seed=123,
-            vecnorm_path=vecnorm, frame_stack_dqn=fs_hint
+            algo,
+            model_path,
+            obs_mode,
+            episodes=args.episodes,
+            seed=123,
+            vecnorm_path=vecnorm,
+            frame_stack=fs_hint,
         )
 
         row_out = [
