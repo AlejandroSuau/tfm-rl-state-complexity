@@ -4,15 +4,16 @@ from gymnasium import spaces
 import numpy as np
 from dataclasses import dataclass
 from typing import Tuple, List, Dict
-from .constants import EMPTY, WALL, COIN, POWER, ACTIONS, DEFAULT_REWARDS
+from .constants import COIN_POWER_TEMPLATE, WALL_TEMPLATE, PLAYER_START, GHOST_START, EMPTY, WALL, COIN, POWER, ACTIONS, DEFAULT_REWARDS
 
 @dataclass
 class ObsConfig:
     """Configuration of environment observations."""
     mode: str = "minimal"  # ["minimal", "bool_power", "power_time", "coins_quadrants", "image"]
-    grid_size: Tuple[int, int] = (15, 15)
-    max_steps: int = 600
-    power_duration: int = 40
+    grid_size: Tuple[int, int] = (20, 17)
+    max_steps: int = 1000
+    power_duration: int = 40 # Steps that power pellet lasts
+    ghost_respawn_delay: int = 15 # Steps to respawn ghost after being eaten
 
 class SimplePacmanEnv(gym.Env):
     """A simplified Pac-Man style environment for RL experiments."""
@@ -29,6 +30,35 @@ class SimplePacmanEnv(gym.Env):
         self._define_spaces()
         self.reset()
 
+    def _build_layout(self):
+        """Initialize grid with static walls, coins and power pellets."""
+        # Forzamos que el grid_size concuerde con la plantilla
+        h, w = COIN_POWER_TEMPLATE.shape
+        self.cfg.grid_size = (h, w)
+
+        self.grid = np.zeros((h, w), dtype=np.int8)
+
+        for y in range(h):
+            for x in range(w):
+                if WALL_TEMPLATE[y, x] == 1:
+                    self.grid[y, x] = WALL
+                else:
+                    val = COIN_POWER_TEMPLATE[y, x]
+                    if val == 1:
+                        self.grid[y, x] = COIN
+                    elif val == 2:
+                        self.grid[y, x] = POWER
+                    else:
+                        self.grid[y, x] = EMPTY
+
+        # Keep a copy of the initial grid for reset
+        self._initial_grid = self.grid.copy()
+
+        # Initial statistics
+        self.coins_total = int(np.sum(self.grid == COIN))
+        self.coins_remaining = self.coins_total
+        self.power_pellets_remaining = int(np.sum(self.grid == POWER))
+
     # ---------- Gym API ----------
     def reset(self, *, seed: int | None = None, options=None):
         """Reset the environment state."""
@@ -40,14 +70,19 @@ class SimplePacmanEnv(gym.Env):
         self.powers_picked = 0
         self.ghosts_eaten = 0
 
-        # Place player and ghost in random empty cells
-        self.player_pos = self._find_empty()
-        self.ghost_pos = self._find_empty()
-        while self.ghost_pos == self.player_pos:
-            self.ghost_pos = self._find_empty()
+        # Restaurar layout inicial estático (2)
+        self.grid = self._initial_grid.copy()
+        self.coins_remaining = int(np.sum(self.grid == COIN))
+        self.coins_total = self.coins_remaining
+        self.power_pellets_remaining = int(np.sum(self.grid == POWER))
 
-        # Place collectibles
-        self._place_coins_and_powers()
+        self.player_pos = PLAYER_START
+        self.player_dir: Tuple[int, int] | None = None
+
+        self.ghost_pos = GHOST_START
+        self.ghost_dir: Tuple[int, int] | None = None
+        self.ghost_alive: bool = True
+        self.ghost_respawn_timer: int = 0
 
         obs = self._get_obs()
         info = self._info()
@@ -61,20 +96,22 @@ class SimplePacmanEnv(gym.Env):
             action = int(action.item())
         else:
             action = int(action)
-        action = int(np.clip(action, 0, 4))
+        action = int(np.clip(action, 0, self.action_space.n - 1))
 
         self.steps += 1
         self._move_player(action)
-        self._move_ghost()
+        
+        # --- Ghost movement with speed reduction in power time ---
+        self._update_ghost_state_before_move()
+        if self.ghost_alive and self._ghost_should_move():
+            self._move_ghost()
+
         reward = 0.0
         terminated = False
 
         # --- Collect coin ---
         if self.grid[self.player_pos] == COIN:
             reward += self.rewards["coin"]
-            if self.power_timer > 0:
-                reward += self.rewards.get("coin_power_bonus", 0.0)
-
             self.grid[self.player_pos] = EMPTY
             self.coins_remaining -= 1
 
@@ -90,12 +127,14 @@ class SimplePacmanEnv(gym.Env):
             self.power_pellets_remaining -= 1
             self.powers_picked += 1
 
-        # --- Collision with ghost ---
-        if self.player_pos == self.ghost_pos:
+        # --- Collision with ghost (only if it is alive) ---
+        if self.ghost_alive and self.player_pos == self.ghost_pos:
             if self.power_timer > 0:  # Ghost is vulnerable
                 self.ghosts_eaten += 1
                 reward += self.rewards["eat_ghost"]
-                self.ghost_pos = self._find_empty()
+                # Ghost dies and spawns after a delay
+                self.ghost_alive = False
+                self.ghost_respawn_timer = int(self.cfg.ghost_respawn_delay)
             else:  # Player dies
                 reward += self.rewards["death"]
                 terminated = True
@@ -140,78 +179,195 @@ class SimplePacmanEnv(gym.Env):
             
             self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(dim,), dtype=np.float32)
 
-        self.action_space = spaces.Discrete(5)  # up, down, left, right, no-op
+        self.action_space = spaces.Discrete(4)  # up, down, left, right
 
         # Reward mapping
         self.rewards = DEFAULT_REWARDS
 
-    def _build_layout(self):
-        """Initialize grid with walls and empty cells."""
-        h, w = self.cfg.grid_size
-        self.grid = np.zeros((h, w), dtype=np.int8)
-
-        # Borders as walls
-        self.grid[0, :] = WALL
-        self.grid[-1, :] = WALL
-        self.grid[:, 0] = WALL
-        self.grid[:, -1] = WALL
-
-        # Internal simple walls
-        for i in range(2, h - 2, 4):
-            self.grid[i, 2:w - 2:4] = WALL
-
-    def _place_coins_and_powers(self):
-        """Randomly distribute coins and power pellets."""
-        h, w = self.cfg.grid_size
-        self.grid[self.grid == COIN] = EMPTY
-        self.grid[self.grid == POWER] = EMPTY
-
-        # Place coins
-        empties = list(zip(*np.where(self.grid == EMPTY)))
-        self.rng.shuffle(empties)
-        n_coins = int(0.40 * len(empties))
-        for pos in empties[:n_coins]:
-            self.grid[pos] = COIN
-        self.coins_remaining = n_coins
-        self.coins_total = n_coins
-
-        # Place power pellets
-        leftover = empties[n_coins:]
-        self.power_pellets_remaining = min(2, len(leftover))
-        for pos in leftover[:self.power_pellets_remaining]:
-            self.grid[pos] = POWER
-
     # ---------- Dynamics ----------
-    def _find_empty(self) -> Tuple[int, int]:
-        """Return a random empty position in the grid."""
-        empties = np.argwhere(self.grid == EMPTY)
-        idx = self.rng.integers(len(empties))
-        return tuple(empties[idx])
+
+    def _valid_directions(self, pos: Tuple[int, int]) -> List[Tuple[int, int]]:
+        """
+        Devuelve la lista de direcciones (dy, dx) posibles desde pos
+        que no chocan con un muro.
+        """
+        y, x = pos
+        h, w = self.grid.shape
+        dirs = []
+        for dy, dx in ACTIONS.values():  # ACTIONS: {0:(-1,0), 1:(1,0), 2:(0,-1), 3:(0,1)}
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < h and 0 <= nx < w and self.grid[ny, nx] != WALL:
+                dirs.append((dy, dx))
+        return dirs
+
+    def _can_move(self, pos: Tuple[int, int], direction: Tuple[int, int]) -> bool:
+        """Devuelve True si desde pos podemos avanzar una celda en 'direction' sin chocar con un muro."""
+        if direction is None:
+            return False
+        y, x = pos
+        dy, dx = direction
+        ny, nx = y + dy, x + dx
+        h, w = self.grid.shape
+        if not (0 <= ny < h and 0 <= nx < w):
+            return False
+        return self.grid[ny, nx] != WALL
+
+    def _is_decision_point(
+        self,
+        pos: Tuple[int, int],
+        current_dir: Tuple[int, int] | None,
+    ) -> bool:
+        """
+        Devuelve True si Pacman puede TOMAR UNA DECISIÓN en esta celda.
+        Reglas:
+        - Si aún no tiene dirección (inicio), es un punto de decisión.
+        - Si hay varias direcciones posibles distintas de la contraria
+          (esquina o intersección), también.
+        - En un pasillo recto solo hay seguir recto o girar 180º -> no es punto de decisión.
+        """
+        free_dirs = self._valid_directions(pos)
+
+        # Sin dirección previa -> primera decisión
+        if current_dir is None:
+            return True
+
+        rev = (-current_dir[0], -current_dir[1])
+        non_reverse = [d for d in free_dirs if d != rev]
+
+        # Si hay más de una alternativa no reversa, o la única opción no es la actual,
+        # consideramos que hay decisión (p.ej. esquina o intersección).
+        if len(non_reverse) > 1:
+            return True
+
+        # Pasillo recto típico: [current_dir, rev] -> non_reverse = [current_dir] -> no decisión
+        return False
+
+    def _ghost_should_move(self) -> bool:
+        """Return True if the ghost should move this step, taking into account power-time speed."""
+        if self.power_timer <= 0:
+            return True
+        
+        # Reduce ghost speed by half during power time
+        return (self.steps % 2) == 0
+
+    def _update_ghost_state_before_move(self):
+        """Handle ghost respawn timers and dead state (5)."""
+        if not self.ghost_alive:
+            if self.ghost_respawn_timer > 0:
+                self.ghost_respawn_timer -= 1
+            if self.ghost_respawn_timer == 0:
+                # Respawn fixed pos
+                self.ghost_pos = GHOST_START
+                self.ghost_dir = None
+                self.ghost_alive = True
 
     def _move_player(self, action: int):
-        """Move player according to chosen action."""
-        dy, dx = ACTIONS[action]
-        ny = int(np.clip(self.player_pos[0] + dy, 0, self.grid.shape[0] - 1))
-        nx = int(np.clip(self.player_pos[1] + dx, 0, self.grid.shape[1] - 1))
-        if self.grid[ny, nx] != WALL:
-            self.player_pos = (ny, nx)
+        """
+        Movimiento de Pacman:
+        - Solo cambia de dirección en puntos de decisión (intersecciones / esquinas).
+        - El agente NO puede elegir girar 180º si hay otra salida.
+        - En un callejón sin salida, se permite el 180º de forma forzada.
+        """
+        y, x = self.player_pos
+
+        # Dirección sugerida por la acción del agente
+        proposed_dir = ACTIONS[action]
+
+        # 1) Si estamos en un punto de decisión, intentamos aplicar la acción
+        need_new_dir = (
+            self.player_dir is None
+            or self._is_decision_point(self.player_pos, self.player_dir)
+            or not self._can_move(self.player_pos, self.player_dir)
+        )
+
+        if need_new_dir:
+            free_dirs = self._valid_directions(self.player_pos)
+
+            # Si no hay movimientos posibles, nos quedamos quietos (no debería ocurrir salvo bug)
+            if not free_dirs:
+                return
+
+            # Manejo de la restricción de 180º
+            if self.player_dir is not None:
+                rev = (-self.player_dir[0], -self.player_dir[1])
+
+                # Si la acción intenta girar 180º, solo la aceptamos si NO hay alternativa
+                if proposed_dir == rev:
+                    non_reverse = [d for d in free_dirs if d != rev]
+                    if non_reverse:
+                        # Hay alternativas -> ignoramos el 180º del agente
+                        proposed_dir = self.player_dir  # seguir como está
+                    # Si no hay alternativas, estamos en un callejón -> permitimos 180º forzado
+
+            # Si la dirección propuesta lleva contra un muro, buscamos otra
+            if not self._can_move(self.player_pos, proposed_dir):
+                # Preferimos mantener la dirección actual si es válida
+                if self.player_dir is not None and self._can_move(self.player_pos, self.player_dir):
+                    chosen_dir = self.player_dir
+                else:
+                    # Elegimos alguna dirección válida, evitando 180º si es posible
+                    if self.player_dir is not None and len(free_dirs) > 1:
+                        rev = (-self.player_dir[0], -self.player_dir[1])
+                        non_reverse = [d for d in free_dirs if d != rev]
+                        free_dirs = non_reverse or free_dirs
+                    chosen_dir = free_dirs[0]
+            else:
+                chosen_dir = proposed_dir
+
+            self.player_dir = chosen_dir
+
+        # 2) Avanzamos una celda en la dirección actual (si es posible)
+        if self.player_dir is not None and self._can_move(self.player_pos, self.player_dir):
+            dy, dx = self.player_dir
+            self.player_pos = (y + dy, x + dx)
+
 
     def _move_ghost(self):
-        """Simple ghost policy: 50% chase, 50% random move."""
-        if self.rng.random() < 0.35:
-            dy = np.sign(self.player_pos[0] - self.ghost_pos[0])
-            dx = np.sign(self.player_pos[1] - self.ghost_pos[1])
-            candidates = [(dy, 0), (0, dx)]
-        else:
-            candidates = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        """
+        Fantasma perseguidor:
+        - Siempre intenta acercarse a Pacman (distancia Manhattan).
+        - Evita giros de 180º salvo que no haya otra opción (evita bucles arriba/abajo).
+        - Nunca atraviesa muros.
+        """
+        y, x = self.ghost_pos
 
-        self.rng.shuffle(candidates)
-        for dy, dx in candidates:
-            ny = int(np.clip(self.ghost_pos[0] + dy, 0, self.grid.shape[0] - 1))
-            nx = int(np.clip(self.ghost_pos[1] + dx, 0, self.grid.shape[1] - 1))
-            if self.grid[ny, nx] != WALL:
-                self.ghost_pos = (ny, nx)
-                break
+        free_dirs = self._valid_directions(self.ghost_pos)
+        if not free_dirs:
+            return  # no hay movimiento posible (muy raro)
+
+        # Intentamos evitar el giro de 180º si hay más de una opción
+        if self.ghost_dir is not None and len(free_dirs) > 1:
+            rev = (-self.ghost_dir[0], -self.ghost_dir[1])
+            non_reverse = [d for d in free_dirs if d != rev]
+            if non_reverse:
+                free_dirs = non_reverse  # evitamos 180º si podemos
+
+        py, px = self.player_pos
+
+        # Elegimos las direcciones que minimizan la distancia Manhattan a Pacman
+        def dist_after_move(d: Tuple[int, int]) -> int:
+            ny, nx = y + d[0], x + d[1]
+            return abs(py - ny) + abs(px - nx)
+
+        dists = [dist_after_move(d) for d in free_dirs]
+        min_dist = min(dists)
+
+        # Ruptura de loops: 10% random alternativo
+        if self.rng.random() < 0.1 and len(free_dirs) > 1:
+            # evitar reverse si es posible
+            if self.ghost_dir is not None:
+                rev = (-self.ghost_dir[0], -self.ghost_dir[1])
+                non_reverse = [d for d in free_dirs if d != rev]
+                free_dirs = non_reverse or free_dirs
+            dy, dx = free_dirs[self.rng.integers(len(free_dirs))]
+        else:
+            # política greedy perseguidora
+            best_dirs = [d for d, dd in zip(free_dirs, dists) if dd == min_dist]
+            dy, dx = best_dirs[self.rng.integers(len(best_dirs))]
+
+        self.ghost_dir = (dy, dx)
+        self.ghost_pos = (y + dy, x + dx)
+
 
     # ---------- Observations ----------
     def _norm_pos(self, pos: Tuple[int, int]) -> List[float]:
@@ -284,18 +440,20 @@ class SimplePacmanEnv(gym.Env):
             layers = self._render_layers()  # (H, W, 5)
             h, w, _ = layers.shape
             img = np.zeros((h, w, 3), dtype=np.uint8)
+            
+            # === PALETA ALTO CONTRASTE ===
+            WALL_COLOR   = (100, 100, 100)   # Gris oscuro
+            COIN_COLOR   = (255, 215, 0)     # Amarillo oro brillante
+            POWER_COLOR  = (0, 200, 255)     # Cian brillante
+            PLAYER_COLOR = (0, 255, 100)     # Verde lima
+            GHOST_COLOR  = (255, 60, 60)     # Rojo intenso
+            # ==============================
 
-            # Fondo negro por defecto
-            # Paredes -> gris
-            img[layers[:, :, 0] == 1] = (80, 80, 80)
-            # Monedas -> amarillo
-            img[layers[:, :, 1] == 1] = (255, 215, 0)
-            # Powers -> azul
-            img[layers[:, :, 2] == 1] = (0, 0, 255)
-            # Jugador -> amarillo brillante
-            img[layers[:, :, 3] == 1] = (255, 255, 0)
-            # Fantasma -> rojo
-            img[layers[:, :, 4] == 1] = (255, 0, 0)
+            img[layers[:, :, 0] == 1] = WALL_COLOR
+            img[layers[:, :, 1] == 1] = COIN_COLOR
+            img[layers[:, :, 2] == 1] = POWER_COLOR
+            img[layers[:, :, 3] == 1] = PLAYER_COLOR
+            img[layers[:, :, 4] == 1] = GHOST_COLOR
 
             return img
 
