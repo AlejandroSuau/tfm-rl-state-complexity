@@ -201,61 +201,73 @@ def main() -> None:
     )
     callbacks.append(checkpoint_callback)
 
-    # ---------- Entrenamiento ----------
-    model.learn(
-        total_timesteps=int(args.timesteps),
-        progress_bar=True,
-        tb_log_name=run_name,
-        callback=callbacks if callbacks else None,
-        reset_num_timesteps=not continuing,
-    )
+    # ========== Entrenamiento con manejo de interrupción ==========
+    interrupted = False
+    try:
+        model.learn(
+            total_timesteps=int(args.timesteps),
+            log_interval=100,
+            progress_bar=True,
+            callback=callbacks if callbacks else None,
+            reset_num_timesteps=not continuing,
+        )
+    except KeyboardInterrupt:
+        interrupted = True
+        print("\n[WARN] Entrenamiento DQN interrumpido por el usuario (Ctrl+C). Guardando estado...")
+    finally:
+        # ========== Guardar modelo y VecNormalize ==========
+        model_path = os.path.join(last_dir, f"{run_name}.zip")
+        model.save(model_path)
 
-    # ---------- Guardar modelo y VecNormalize (last + best vecnorm) ----------
-    model_path = os.path.join(last_dir, f"{run_name}.zip")
-    model.save(model_path)
+        # Guardar VecNormalize si existe
+        if isinstance(venv, VecNormalize):
+            vecnorm_path = os.path.join(last_dir, f"vecnorm_{run_name}.pkl")
+            venv.save(vecnorm_path)
 
-    if isinstance(venv, VecNormalize):
-        vecnorm_path = os.path.join(last_dir, f"vecnorm_{run_name}.pkl")
-        venv.save(vecnorm_path)
+            # Copia también al best/
+            best_vecnorm_path = os.path.join(best_dir, f"vecnorm_{run_name}.pkl")
+            venv.save(best_vecnorm_path)
+        else:
+            vecnorm_path = None
 
-        # Copia de vecnorm también junto al best model
-        best_vecnorm_path = os.path.join(best_dir, f"vecnorm_{run_name}.pkl")
-        venv.save(best_vecnorm_path)
-    else:
-        vecnorm_path = None
+        # ========== Log de ejecución ==========
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        os.makedirs("experiments/runs", exist_ok=True)
 
-    # ---------- Log de la ejecución ----------
-    stamp = time.strftime("%Y%m%d-%H%M%S")
-    os.makedirs("experiments/runs", exist_ok=True)
-    run_rec = {
-        "algo": "dqn",
-        "obs_mode": args.obs_mode,
-        "seed": args.seed,
-        "timesteps": args.timesteps,
-        "model_path": model_path,
-        "vecnorm_path": vecnorm_path,
-        "frame_stack": args.frame_stack,
-        "vecnorm": int(isinstance(venv, VecNormalize)),
-        "lr": args.lr,
-        "gamma": args.gamma,
-        "buffer_size": args.buffer_size,
-        "learning_starts": args.learning_starts,
-        "batch_size": args.batch_size,
-        "train_freq": args.train_freq,
-        "gradient_steps": args.gradient_steps,
-        "target_update_interval": args.target_update_interval,
-        "exploration_fraction": args.exploration_fraction,
-        "exploration_final_eps": args.exploration_final_eps,
-        "net_arch": net_arch,
-        "continue_model": args.continue_model,
-        "continue_vecnorm": args.continue_vecnorm,
-    }
-    with open(
-        f"experiments/runs/{run_name}_{stamp}.json", "w"
-    ) as f:
-        json.dump(run_rec, f, indent=2)
+        run_rec = {
+            "algo": "dqn",
+            "obs_mode": args.obs_mode,
+            "seed": args.seed,
+            "timesteps": args.timesteps,
+            "model_path": model_path,
+            "vecnorm_path": vecnorm_path,
+            "frame_stack": args.frame_stack,
+            "vecnorm": int(isinstance(venv, VecNormalize)),
+            "lr": args.lr,
+            "batch_size": args.batch_size,
+            "buffer_size": args.buffer_size,
+            "learning_starts": args.learning_starts,
+            "train_freq": args.train_freq,
+            "gradient_steps": args.gradient_steps,
+            "target_update_interval": args.target_update_interval,
+            "gamma": args.gamma,
+            "exploration_fraction": args.exploration_fraction,
+            "exploration_final_eps": args.exploration_final_eps,
+            "net_arch": net_arch,
+            "continue_model": args.continue_model,
+            "continue_vecnorm": args.continue_vecnorm,
+            "interrupted": int(interrupted),
+        }
 
-    print("✅ DQN listo:", model_path, "| vecnorm:", vecnorm_path)
+        json_path = f"experiments/runs/{run_name}_{stamp}.json"
+        with open(json_path, "w") as f:
+            json.dump(run_rec, f, indent=2)
+
+        if interrupted:
+            print(f"⏹️ Entrenamiento DQN interrumpido. Modelo guardado en: {model_path}")
+        else:
+            print(f"✅ DQN listo: {model_path} | vecnorm: {vecnorm_path}")
+
 
 
 if __name__ == "__main__":

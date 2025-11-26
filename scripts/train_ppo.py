@@ -240,67 +240,76 @@ def main() -> None:
     )
     callbacks.append(checkpoint_callback)
 
-    # ---------- Entrenamiento ----------
-    model.learn(
-        total_timesteps=int(args.timesteps),
-        progress_bar=True,
-        tb_log_name=run_name,
-        callback=callbacks if callbacks else None,
-        # CLAVE: si continuamos, no reseteamos el contador global
-        reset_num_timesteps=not continuing,
-    )
-
-    # ---------- Guardar modelo y estado de VecNormalize ----------
-    model_path = os.path.join(last_dir, f"{run_name}.zip")
-    model.save(model_path)
-
-    # train_env es VecNormalize solo si args.vecnorm=1 o si cargamos continue_vecnorm
-    if isinstance(train_env, VecNormalize):
-        # VecNormalize para el último modelo
-        vecnorm_path = os.path.join(
-            last_dir, f"vecnorm_{run_name}.pkl"
+    # ---------- Entrenamiento con manejo de interrupción ----------
+    interrupted = False
+    try:
+        model.learn(
+            total_timesteps=int(args.timesteps),
+            progress_bar=True,
+            tb_log_name=run_name,
+            callback=callbacks if callbacks else None,
+            # CLAVE: si continuamos, no reseteamos el contador global
+            reset_num_timesteps=not continuing,
         )
-        train_env.save(vecnorm_path)
+    except KeyboardInterrupt:
+        interrupted = True
+        print("\n[WARN] Entrenamiento interrumpido por el usuario (Ctrl+C). "
+              "Guardando modelo y VecNormalize como 'last'...")
+    finally:
+        # ---------- Guardar modelo y estado de VecNormalize ----------
+        model_path = os.path.join(last_dir, f"{run_name}.zip")
+        model.save(model_path)
 
-        # Copia también a best/ para evaluar el best_model.zip
-        best_vecnorm_path = os.path.join(
-            best_dir, f"vecnorm_{run_name}.pkl"
-        )
-        train_env.save(best_vecnorm_path)
-    else:
-        vecnorm_path = None
+        # train_env es VecNormalize solo si args.vecnorm=1 o si cargamos continue_vecnorm
+        if isinstance(train_env, VecNormalize):
+            # VecNormalize para el último modelo
+            vecnorm_path = os.path.join(last_dir, f"vecnorm_{run_name}.pkl")
+            train_env.save(vecnorm_path)
 
-    # ---------- Log de la ejecución en experiments/runs ----------
-    stamp = time.strftime("%Y%m%d-%H%M%S")
-    os.makedirs("experiments/runs", exist_ok=True)
-    run_rec = {
-        "algo": "ppo",
-        "obs_mode": args.obs_mode,
-        "seed": args.seed,
-        "timesteps": args.timesteps,
-        "model_path": model_path,
-        "vecnorm_path": vecnorm_path,
-        "frame_stack": args.frame_stack,
-        "vecnorm": int(isinstance(train_env, VecNormalize)),
-        "lr": args.lr,
-        "gamma": args.gamma,
-        "ent_coef": args.ent_coef,
-        "clip_range": args.clip_range,
-        "gae_lambda": args.gae_lambda,
-        "net_arch": net_arch,
-        "n_envs": args.n_envs,
-        "n_steps": args.n_steps,
-        "batch_size": args.batch_size,
-        "n_epochs": args.n_epochs,
-        "continue_model": args.continue_model,
-        "continue_vecnorm": args.continue_vecnorm,
-    }
-    with open(
-        f"experiments/runs/{run_name}_{stamp}.json", "w"
-    ) as f:
-        json.dump(run_rec, f, indent=2)
+            # Copia también a best/ para evaluar el best_model.zip
+            best_vecnorm_path = os.path.join(best_dir, f"vecnorm_{run_name}.pkl")
+            train_env.save(best_vecnorm_path)
+        else:
+            vecnorm_path = None
 
-    print("✅ PPO listo:", model_path, "| vecnorm:", vecnorm_path)
+        # ---------- Log de la ejecución en experiments/runs ----------
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        os.makedirs("experiments/runs", exist_ok=True)
+
+        run_rec = {
+            "algo": "ppo",
+            "obs_mode": args.obs_mode,
+            "seed": args.seed,
+            "timesteps": args.timesteps,
+            "model_path": model_path,
+            "vecnorm_path": vecnorm_path,
+            "frame_stack": args.frame_stack,
+            "vecnorm": int(isinstance(train_env, VecNormalize)),
+            "lr": args.lr,
+            "gamma": args.gamma,
+            "ent_coef": args.ent_coef,
+            "clip_range": args.clip_range,
+            "gae_lambda": args.gae_lambda,
+            "net_arch": net_arch,
+            "n_envs": args.n_envs,
+            "n_steps": args.n_steps,
+            "batch_size": args.batch_size,
+            "n_epochs": args.n_epochs,
+            "continue_model": args.continue_model,
+            "continue_vecnorm": args.continue_vecnorm,
+            # NUEVO: marcamos si fue interrumpido
+            "interrupted": int(interrupted),
+        }
+
+        json_path = f"experiments/runs/{run_name}_{stamp}.json"
+        with open(json_path, "w") as f:
+            json.dump(run_rec, f, indent=2)
+
+        if interrupted:
+            print(f"⏹️ Entrenamiento PPO interrumpido. Último modelo guardado en: {model_path}")
+        else:
+            print(f"✅ PPO listo: {model_path} | vecnorm: {vecnorm_path}")
+
 
 
 if __name__ == "__main__":

@@ -216,59 +216,69 @@ def main() -> None:
     )
     callbacks.append(checkpoint_callback)
 
-    # ---------- Entrenamiento ----------
-    model.learn(
-        total_timesteps=int(args.timesteps),
-        progress_bar=True,
-        tb_log_name=run_name,
-        callback=callbacks if callbacks else None,
-        # CLAVE: si continuamos, no reseteamos el contador global
-        reset_num_timesteps=not continuing,
-    )
+    # ========== Entrenamiento con manejo de interrupción ==========
+    interrupted = False
+    try:
+        model.learn(
+            total_timesteps=int(args.timesteps),
+            progress_bar=True,
+            callback=callbacks if callbacks else None,
+            reset_num_timesteps=not continuing,
+        )
+    except KeyboardInterrupt:
+        interrupted = True
+        print("\n[WARN] Entrenamiento A2C interrumpido por el usuario (Ctrl+C). Guardando estado...")
+    finally:
+        # ========== Guardar modelo y VecNormalize ==========
+        model_path = os.path.join(last_dir, f"{run_name}.zip")
+        model.save(model_path)
 
-    # ---------- Guardar modelo y estado de VecNormalize ----------
-    model_path = os.path.join(last_dir, f"{run_name}.zip")
-    model.save(model_path)
+        # Guardar VecNormalize si existe
+        if isinstance(train_env, VecNormalize):
+            vecnorm_path = os.path.join(last_dir, f"vecnorm_{run_name}.pkl")
+            train_env.save(vecnorm_path)
 
-    if args.vecnorm:
-        # VecNormalize para el último modelo
-        vecnorm_path = os.path.join(last_dir, f"vecnorm_{run_name}.pkl")
-        train_env.save(vecnorm_path)
+            # Copia también a best/
+            best_vecnorm_path = os.path.join(best_dir, f"vecnorm_{run_name}.pkl")
+            train_env.save(best_vecnorm_path)
+        else:
+            vecnorm_path = None
 
-        # Copia también a best/ para evaluar el best_model.zip
-        best_vecnorm_path = os.path.join(best_dir, f"vecnorm_{run_name}.pkl")
-        train_env.save(best_vecnorm_path)
-    else:
-        vecnorm_path = None
+        # ========== Log de ejecución ==========
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        os.makedirs("experiments/runs", exist_ok=True)
 
-    # ---------- Log de la ejecución en experiments/runs ----------
-    stamp = time.strftime("%Y%m%d-%H%M%S")
-    os.makedirs("experiments/runs", exist_ok=True)
-    run_rec = {
-        "algo": "a2c",
-        "obs_mode": args.obs_mode,
-        "seed": args.seed,
-        "timesteps": args.timesteps,
-        "model_path": model_path,
-        "vecnorm_path": vecnorm_path,
-        "frame_stack": args.frame_stack,
-        "vecnorm": int(isinstance(train_env, VecNormalize)),
-        "lr": args.lr,
-        "gamma": args.gamma,
-        "ent_coef": args.ent_coef,
-        "gae_lambda": args.gae_lambda,
-        "net_arch": net_arch,
-        "n_envs": args.n_envs,
-        "n_steps": args.n_steps,
-        "continue_model": args.continue_model,
-        "continue_vecnorm": args.continue_vecnorm,
-    }
-    with open(
-        f"experiments/runs/{run_name}_{stamp}.json", "w"
-    ) as f:
-        json.dump(run_rec, f, indent=2)
+        run_rec = {
+            "algo": "a2c",
+            "obs_mode": args.obs_mode,
+            "seed": args.seed,
+            "timesteps": args.timesteps,
+            "model_path": model_path,
+            "vecnorm_path": vecnorm_path,
+            "frame_stack": args.frame_stack,
+            "vecnorm": int(isinstance(train_env, VecNormalize)),
+            "lr": args.lr,
+            "gamma": args.gamma,
+            "gae_lambda": args.gae_lambda,
+            "ent_coef": args.ent_coef,
+            "vf_coef": args.vf_coef,
+            "max_grad_norm": args.max_grad_norm,
+            "use_rms_prop": args.use_rms_prop,
+            "net_arch": net_arch,
+            "continue_model": args.continue_model,
+            "continue_vecnorm": args.continue_vecnorm,
+            "interrupted": int(interrupted),
+        }
 
-    print("✅ A2C listo:", model_path, "| vecnorm:", vecnorm_path)
+        json_path = f"experiments/runs/{run_name}_{stamp}.json"
+        with open(json_path, "w") as f:
+            json.dump(run_rec, f, indent=2)
+
+        if interrupted:
+            print(f"⏹️ Entrenamiento A2C interrumpido. Modelo guardado en: {model_path}")
+        else:
+            print(f"✅ A2C listo: {model_path} | vecnorm: {vecnorm_path}")
+
 
 
 if __name__ == "__main__":
