@@ -1,14 +1,14 @@
 {
   "algo": "a2c",
   "obs_mode": "coins_quadrants",
-  "timesteps_per_trial": 200000,
-  "best_value": 0.042898384807631376,
+  "timesteps_per_trial": 300000,
+  "best_value": 112.5559988413006,
   "best_params": {
-    "lr": 0.000982875611786671,
-    "gamma": 0.9384056873452105,
-    "ent_coef": 0.008768040318454925,
-    "net_arch": "256,128",
-    "n_steps": 64,
-    "gae_lambda": 0.9388017209400694
+    "lr": 0.00041501863767692924,
+    "gamma": 0.9949236856190979,
+    "ent_coef": 0.0008882804900962875,
+    "net_arch": "128,128",
+    "n_steps": 32,
+    "gae_lambda": 0.9795371133779086
   }
 }

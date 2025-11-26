@@ -1,15 +1,19 @@
 {
   "algo": "ppo",
   "obs_mode": "bool_power",
-  "timesteps_per_trial": 200000,
-  "best_value": 1.3638872423907742,
+  "timesteps_per_trial": 150000,
+  "best_value": 99.9119990311563,
   "best_params": {
-    "lr": 0.0009711764240494682,
-    "gamma": 0.9000996388685408,
-    "ent_coef": 0.0008231307044953336,
+    "lr": 0.00018766899124065837,
+    "gamma": 0.9548719406674566,
+    "ent_coef": 0.004012268107150393,
     "net_arch": "128,128",
-    "n_steps": 128,
-    "batch_factor": 8,
-    "n_epochs": 10
+    "n_steps": 256,
+    "batch_size": 64,
+    "n_epochs": 16,
+    "gae_lambda": 0.9337924827979776,
+    "clip_range": 0.16085501107747438,
+    "vf_coef": 0.9728604094181781,
+    "max_grad_norm": 0.9303594264706124
   }
 }

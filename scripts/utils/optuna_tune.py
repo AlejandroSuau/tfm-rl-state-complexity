@@ -77,19 +77,21 @@ def build_vecenv(algo: str, obs_mode: str, seed: int, n_envs: int = 8, frame_sta
         return venv
 
 
-def evaluate(model, env, n_episodes: int = 5):
+def evaluate(model, env, n_episodes: int = 10):
     """
     Runs several evaluation episodes using a trained model and returns
-    the mean total reward. Compatible with vectorized environments.
-
-    Args:
-        model: trained RL model (PPO, A2C, DQN)
-        env: environment to evaluate on
-        n_episodes: number of evaluation episodes
-
-    Returns:
-        Mean episodic return across all evaluation episodes.
+    the mean total *true* reward (sin normalización).
+    Compatible with vectorized environments.
     """
+    # Si hay VecNormalize, desactiva normalización de reward durante la eval
+
+    is_vecnorm = isinstance(env, VecNormalize)
+    if is_vecnorm:
+        old_training = env.training
+        old_norm_reward = env.norm_reward
+        env.training = False
+        env.norm_reward = False
+
     ep_returns = []
     for _ in range(n_episodes):
         obs = env.reset()
@@ -97,12 +99,17 @@ def evaluate(model, env, n_episodes: int = 5):
         done = False
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            # VecEnv returns (obs, rewards, dones, infos)
             obs, reward, dones, info = env.step(action)
             ep_ret += float(np.asarray(reward).mean())
             done = bool(np.asarray(dones).any())
         ep_returns.append(ep_ret)
+
+    if is_vecnorm:
+        env.training = old_training
+        env.norm_reward = old_norm_reward
+
     return float(np.mean(ep_returns))
+
 
 
 # ============================================================
@@ -115,10 +122,10 @@ def suggest_shared(trial):
     learning rate, gamma, entropy coefficient and network architecture.
     """
     return {
-        "learning_rate": trial.suggest_float("lr", 1e-5, 1e-3, log=True),
-        "gamma": trial.suggest_float("gamma", 0.90, 0.999),
-        "ent_coef": trial.suggest_float("ent_coef", 1e-4, 0.05, log=True),
-        "net_arch": trial.suggest_categorical("net_arch", ["64,64", "128,128", "256,128"]),
+        "learning_rate": trial.suggest_float("lr", 3e-5, 5e-4, log=True),
+        "gamma": trial.suggest_float("gamma", 0.92, 0.995),
+        "ent_coef": trial.suggest_float("ent_coef", 0.0, 0.02),
+        "net_arch": trial.suggest_categorical("net_arch", ["64,64", "128,128"]),
     }
 
 
@@ -129,19 +136,16 @@ def suggest_ppo(trial, n_envs: int):
     The batch size is derived dynamically from the rollout size (n_steps * n_envs)
     divided by a sampled batch_factor to ensure divisibility and avoid truncated minibatches.
     """
-    n_steps = trial.suggest_categorical("n_steps", [128, 256, 512])
-    rollout = n_steps * n_envs
-    batch_factor = trial.suggest_categorical("batch_factor", [1, 2, 4, 8])
-
-    batch_size = rollout // batch_factor
-    if batch_size < 128:
-        batch_size = 128  # Safety floor
-
-    # Store derived value for logging/debugging
-    trial.set_user_attr("derived_batch_size", batch_size)
-
-    n_epochs = trial.suggest_categorical("n_epochs", [4, 8, 10])
-    return {"n_steps": n_steps, "batch_size": batch_size, "n_epochs": n_epochs}
+    return {
+        "n_steps": trial.suggest_categorical("n_steps", [64, 128, 256]),
+        "batch_size": trial.suggest_categorical("batch_size", [64, 128, 256]),
+        "n_epochs": trial.suggest_categorical("n_epochs", [4, 8, 16]),
+        "gae_lambda": trial.suggest_float("gae_lambda", 0.90, 0.98),
+        "clip_range": trial.suggest_float("clip_range", 0.1, 0.3),
+        "ent_coef": trial.suggest_float("ent_coef", 0.0, 0.02),
+        "vf_coef": trial.suggest_float("vf_coef", 0.4, 1.0),
+        "max_grad_norm": trial.suggest_float("max_grad_norm", 0.3, 1.0),
+    }
 
 
 def suggest_a2c(trial):
@@ -149,27 +153,29 @@ def suggest_a2c(trial):
     Search space for A2C-specific hyperparameters.
     """
     return {
-        "n_steps": trial.suggest_categorical("n_steps", [16, 32, 64, 128]),
+        "n_steps": trial.suggest_categorical("n_steps", [32, 64, 128]),
         "gae_lambda": trial.suggest_float("gae_lambda", 0.90, 0.98),
+        "ent_coef": trial.suggest_float("ent_coef", 0.0, 0.02),
     }
+
 
 
 def suggest_dqn(trial):
     """
     Search space for DQN-specific hyperparameters.
-    Includes replay buffer size, batch size, exploration schedule, and target update frequency.
     """
     return {
         "buffer_size": trial.suggest_categorical("buffer_size", [100_000, 300_000, 500_000]),
         "learning_starts": trial.suggest_categorical("learning_starts", [5_000, 20_000, 50_000]),
         "batch_size": trial.suggest_categorical("batch_size", [128, 256, 512]),
-        "train_freq": trial.suggest_categorical("train_freq", [1, 4, 8]),
+        "train_freq": trial.suggest_categorical("train_freq", [1, 4]),
         "gradient_steps": trial.suggest_categorical("gradient_steps", [1, 2, 4]),
         "target_update_interval": trial.suggest_categorical("target_update_interval", [500, 1000, 2000]),
         "exploration_fraction": trial.suggest_float("exploration_fraction", 0.1, 0.5),
-        "exploration_final_eps": trial.suggest_float("exploration_final_eps", 0.005, 0.05),
+        "exploration_final_eps": trial.suggest_float("exploration_final_eps", 0.01, 0.05),
         "frame_stack": trial.suggest_categorical("frame_stack", [1, 4]),
     }
+
 
 
 # ============================================================
@@ -246,7 +252,7 @@ def main():
     CLI arguments:
       --algo: algorithm name ('ppo', 'a2c', or 'dqn')
       --obs-mode: observation configuration
-      --timesteps: training steps per trial
+      --timesteps: training timesteps per trial
       --trials: number of Optuna trials
       --seed: base random seed
       --n-envs: number of parallel envs for PPO/A2C
@@ -261,10 +267,14 @@ def main():
     ap.add_argument("--n-envs", type=int, default=8, help="Only relevant for PPO/A2C.")
     args = ap.parse_args()
 
-    # ---------- Optuna objective function ----------
+    # ============================================================
+    #  Pruned + chunked objective
+    # ============================================================
     def objective(trial: optuna.Trial):
-        # Shared and algorithm-specific parameters
+        # Shared params
         shared = suggest_shared(trial)
+
+        # Algorithm-specific params + environment
         if args.algo == "ppo":
             specific = suggest_ppo(trial, args.n_envs)
             env = build_vecenv("ppo", args.obs_mode, args.seed, n_envs=args.n_envs)
@@ -277,20 +287,53 @@ def main():
         else:
             raise ValueError("Unsupported algorithm selected.")
 
-        # Model creation and training
+        # Build model
         model = build_model(args.algo, env, shared, specific, seed=args.seed)
-        model.learn(total_timesteps=int(args.timesteps))
 
-        # Evaluation and objective return
-        mean_ret = evaluate(model, env, n_episodes=5)
+        # -------------------------------
+        # Train in CHUNKS + PRUNING
+        # -------------------------------
+        total_steps = args.timesteps
+        n_eval_points = 5
+        chunk = total_steps // n_eval_points
+        last_reward = -1e9
+
+        for i in range(n_eval_points):
+            # Entrenamos un bloque
+            model.learn(total_timesteps=chunk, reset_num_timesteps=False)
+
+            # Evaluamos el modelo
+            mean_reward = evaluate(model, env, n_episodes=5)
+            last_reward = mean_reward
+
+            # Reportar a Optuna
+            step = (i + 1) * chunk
+            trial.report(mean_reward, step)
+
+            # Podar si va mal
+            if trial.should_prune():
+                env.close()
+                raise optuna.TrialPruned()
+
         env.close()
-        return mean_ret
+        return last_reward
 
-    # ---------- Run the optimization ----------
-    study = optuna.create_study(direction="maximize", study_name=f"{args.algo}_{args.obs_mode}")
+    # ============================================================
+    #  Study with PRUNER
+    # ============================================================
+    study = optuna.create_study(
+        direction="maximize",
+        study_name=f"{args.algo}_{args.obs_mode}",
+        pruner=optuna.pruners.MedianPruner(
+            n_startup_trials=5,     # No prune until 5 trials have finished
+            n_warmup_steps=1        # Need at least 1 report() before pruning
+        )
+    )
+
+    # Run optimization
     study.optimize(objective, n_trials=args.trials)
 
-    # ---------- Save best results ----------
+    # Save best results
     os.makedirs("experiments/optuna", exist_ok=True)
     out = {
         "algo": args.algo,
@@ -305,6 +348,7 @@ def main():
 
     print("- Best parameters found:", json.dumps(study.best_params, indent=2))
     print("- Saved to:", out_path)
+
 
 
 if __name__ == "__main__":

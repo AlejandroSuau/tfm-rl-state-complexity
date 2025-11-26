@@ -1,15 +1,19 @@
 {
   "algo": "ppo",
   "obs_mode": "coins_quadrants",
-  "timesteps_per_trial": 200000,
-  "best_value": 0.06717726335627958,
+  "timesteps_per_trial": 150000,
+  "best_value": 109.99799904935063,
   "best_params": {
-    "lr": 0.0001921319568837103,
-    "gamma": 0.9489231406106268,
-    "ent_coef": 0.0015773463438372532,
+    "lr": 0.00036206479899106444,
+    "gamma": 0.9742461839809811,
+    "ent_coef": 0.005997703037445614,
     "net_arch": "128,128",
-    "n_steps": 512,
-    "batch_factor": 1,
-    "n_epochs": 4
+    "n_steps": 64,
+    "batch_size": 256,
+    "n_epochs": 16,
+    "gae_lambda": 0.9098191621555342,
+    "clip_range": 0.29460174519706317,
+    "vf_coef": 0.45362435855301053,
+    "max_grad_norm": 0.9852449880319354
   }
 }

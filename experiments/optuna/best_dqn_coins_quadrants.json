@@ -1,21 +1,21 @@
 {
   "algo": "dqn",
   "obs_mode": "coins_quadrants",
-  "timesteps_per_trial": 200000,
-  "best_value": -46.210002375021574,
+  "timesteps_per_trial": 300000,
+  "best_value": 35.417998208105566,
   "best_params": {
-    "lr": 8.560080224506082e-05,
-    "gamma": 0.9221409801622686,
-    "ent_coef": 0.000684738794498319,
-    "net_arch": "128,128",
-    "buffer_size": 500000,
+    "lr": 0.00017865799093549006,
+    "gamma": 0.9481195807932751,
+    "ent_coef": 0.0050109010319199275,
+    "net_arch": "256,128",
+    "buffer_size": 300000,
     "learning_starts": 5000,
-    "batch_size": 512,
-    "train_freq": 1,
+    "batch_size": 256,
+    "train_freq": 4,
     "gradient_steps": 4,
     "target_update_interval": 500,
-    "exploration_fraction": 0.4862537825603318,
-    "exploration_final_eps": 0.03648748477675753,
+    "exploration_fraction": 0.3903386663447019,
+    "exploration_final_eps": 0.03674126794203493,
     "frame_stack": 4
   }
 }
