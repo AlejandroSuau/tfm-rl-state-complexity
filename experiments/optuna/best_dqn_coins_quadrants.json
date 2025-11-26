@@ -6,7 +6,6 @@
   "best_params": {
     "lr": 0.0004858402505498523,
     "gamma": 0.9297323010609192,
-    "ent_coef": 0.009767617943592457,
     "net_arch": "128,128",
     "buffer_size": 300000,
     "learning_starts": 20000,
