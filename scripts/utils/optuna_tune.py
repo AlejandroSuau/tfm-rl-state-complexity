@@ -143,8 +143,6 @@ def suggest_ppo(trial, n_envs: int):
         "gae_lambda": trial.suggest_float("gae_lambda", 0.90, 0.98),
         "clip_range": trial.suggest_float("clip_range", 0.1, 0.3),
         "ent_coef": trial.suggest_float("ent_coef", 0.0, 0.02),
-        "vf_coef": trial.suggest_float("vf_coef", 0.4, 1.0),
-        "max_grad_norm": trial.suggest_float("max_grad_norm", 0.3, 1.0),
     }
 
 
