@@ -210,6 +210,7 @@ def main() -> None:
             progress_bar=True,
             callback=callbacks if callbacks else None,
             reset_num_timesteps=not continuing,
+            tb_log_name=run_name,
         )
     except KeyboardInterrupt:
         interrupted = True
