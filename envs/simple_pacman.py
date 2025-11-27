@@ -77,7 +77,6 @@ class SimplePacmanEnv(gym.Env):
         self.power_pellets_remaining = int(np.sum(self.grid == POWER))
 
         self.player_pos = PLAYER_START
-        self.player_dir: Tuple[int, int] | None = None
 
         self.ghost_pos = GHOST_START
         self.ghost_dir: Tuple[int, int] | None = None
@@ -200,48 +199,6 @@ class SimplePacmanEnv(gym.Env):
                 dirs.append((dy, dx))
         return dirs
 
-    def _can_move(self, pos: Tuple[int, int], direction: Tuple[int, int]) -> bool:
-        """Devuelve True si desde pos podemos avanzar una celda en 'direction' sin chocar con un muro."""
-        if direction is None:
-            return False
-        y, x = pos
-        dy, dx = direction
-        ny, nx = y + dy, x + dx
-        h, w = self.grid.shape
-        if not (0 <= ny < h and 0 <= nx < w):
-            return False
-        return self.grid[ny, nx] != WALL
-
-    def _is_decision_point(
-        self,
-        pos: Tuple[int, int],
-        current_dir: Tuple[int, int] | None,
-    ) -> bool:
-        """
-        Devuelve True si Pacman puede TOMAR UNA DECISIÓN en esta celda.
-        Reglas:
-        - Si aún no tiene dirección (inicio), es un punto de decisión.
-        - Si hay varias direcciones posibles distintas de la contraria
-          (esquina o intersección), también.
-        - En un pasillo recto solo hay seguir recto o girar 180º -> no es punto de decisión.
-        """
-        free_dirs = self._valid_directions(pos)
-
-        # Sin dirección previa -> primera decisión
-        if current_dir is None:
-            return True
-
-        rev = (-current_dir[0], -current_dir[1])
-        non_reverse = [d for d in free_dirs if d != rev]
-
-        # Si hay más de una alternativa no reversa, o la única opción no es la actual,
-        # consideramos que hay decisión (p.ej. esquina o intersección).
-        if len(non_reverse) > 1:
-            return True
-
-        # Pasillo recto típico: [current_dir, rev] -> non_reverse = [current_dir] -> no decisión
-        return False
-
     def _ghost_should_move(self) -> bool:
         """Return True if the ghost should move this step, taking into account power-time speed."""
         if self.power_timer <= 0:
@@ -263,63 +220,22 @@ class SimplePacmanEnv(gym.Env):
 
     def _move_player(self, action: int):
         """
-        Movimiento de Pacman:
-        - Solo cambia de dirección en puntos de decisión (intersecciones / esquinas).
-        - El agente NO puede elegir girar 180º si hay otra salida.
-        - En un callejón sin salida, se permite el 180º de forma forzada.
+        Mueve a Pacman según la acción del agente:
+
+        - Si la acción apunta a una celda libre, se mueve allí.
+        - Si apunta a un muro o fuera del grid, se queda en la misma posición.
         """
         y, x = self.player_pos
+        dy, dx = ACTIONS[action]
 
-        # Dirección sugerida por la acción del agente
-        proposed_dir = ACTIONS[action]
+        ny, nx = y + dy, x + dx
 
-        # 1) Si estamos en un punto de decisión, intentamos aplicar la acción
-        need_new_dir = (
-            self.player_dir is None
-            or self._is_decision_point(self.player_pos, self.player_dir)
-            or not self._can_move(self.player_pos, self.player_dir)
-        )
-
-        if need_new_dir:
-            free_dirs = self._valid_directions(self.player_pos)
-
-            # Si no hay movimientos posibles, nos quedamos quietos (no debería ocurrir salvo bug)
-            if not free_dirs:
-                return
-
-            # Manejo de la restricción de 180º
-            if self.player_dir is not None:
-                rev = (-self.player_dir[0], -self.player_dir[1])
-
-                # Si la acción intenta girar 180º, solo la aceptamos si NO hay alternativa
-                if proposed_dir == rev:
-                    non_reverse = [d for d in free_dirs if d != rev]
-                    if non_reverse:
-                        # Hay alternativas -> ignoramos el 180º del agente
-                        proposed_dir = self.player_dir  # seguir como está
-                    # Si no hay alternativas, estamos en un callejón -> permitimos 180º forzado
-
-            # Si la dirección propuesta lleva contra un muro, buscamos otra
-            if not self._can_move(self.player_pos, proposed_dir):
-                # Preferimos mantener la dirección actual si es válida
-                if self.player_dir is not None and self._can_move(self.player_pos, self.player_dir):
-                    chosen_dir = self.player_dir
-                else:
-                    # Elegimos alguna dirección válida, evitando 180º si es posible
-                    if self.player_dir is not None and len(free_dirs) > 1:
-                        rev = (-self.player_dir[0], -self.player_dir[1])
-                        non_reverse = [d for d in free_dirs if d != rev]
-                        free_dirs = non_reverse or free_dirs
-                    chosen_dir = free_dirs[0]
-            else:
-                chosen_dir = proposed_dir
-
-            self.player_dir = chosen_dir
-
-        # 2) Avanzamos una celda en la dirección actual (si es posible)
-        if self.player_dir is not None and self._can_move(self.player_pos, self.player_dir):
-            dy, dx = self.player_dir
-            self.player_pos = (y + dy, x + dx)
+        h, w = self.grid.shape
+        if (0 <= ny < h
+            and 0 <= nx < w
+            and self.grid[ny, nx] != WALL):
+            # Movimiento válido
+            self.player_pos = (ny, nx)
 
 
     def _move_ghost(self):
