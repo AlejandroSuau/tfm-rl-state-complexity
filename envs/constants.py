@@ -52,7 +52,7 @@ WALL_TEMPLATE = np.array([
 ], dtype=np.int8)
 
 PLAYER_START = (13, 8)
-GHOST_START  = (6, 8) 
+GHOST_START  = (0, 0) #(6, 8) 
 
 # Grid cell types
 EMPTY: int = 0
@@ -76,8 +76,6 @@ DEFAULT_REWARDS = {
     "clear": 1000.0,
     "death": -100.0,
     "step": -0.01,
-    "power_tick": 0.0,
-    "coin_power_bonus": 0.0,
-    "last_coin_bonus": 0.0,
+    "idle": -0.02
 }
 

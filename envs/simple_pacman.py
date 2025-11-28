@@ -5,6 +5,7 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Tuple, List, Dict
 from .constants import COIN_POWER_TEMPLATE, WALL_TEMPLATE, PLAYER_START, GHOST_START, EMPTY, WALL, COIN, POWER, ACTIONS, DEFAULT_REWARDS
+from collections import deque
 
 @dataclass
 class ObsConfig:
@@ -77,6 +78,7 @@ class SimplePacmanEnv(gym.Env):
         self.power_pellets_remaining = int(np.sum(self.grid == POWER))
 
         self.player_pos = PLAYER_START
+        self.last_player_pos = self.player_pos
 
         self.ghost_pos = GHOST_START
         self.ghost_dir: Tuple[int, int] | None = None
@@ -89,15 +91,12 @@ class SimplePacmanEnv(gym.Env):
 
     def step(self, action: int):
         """Perform one environment step."""
-        if isinstance(action, (list, tuple, np.ndarray)):
-            action = int(np.asarray(action).squeeze()[0]) if np.asarray(action).ndim > 0 else int(np.asarray(action).item())
-        elif hasattr(action, "item"):
-            action = int(action.item())
-        else:
-            action = int(action)
+        action = int(np.asarray(action).squeeze())
         action = int(np.clip(action, 0, self.action_space.n - 1))
-
+        
         self.steps += 1
+        prev_player_pos = self.player_pos
+
         self._move_player(action)
         
         # --- Ghost movement with speed reduction in power time ---
@@ -114,10 +113,6 @@ class SimplePacmanEnv(gym.Env):
             self.grid[self.player_pos] = EMPTY
             self.coins_remaining -= 1
 
-            threshold = max(4, int(0.10 * self.coins_total))
-            if self.coins_remaining <= threshold:
-                reward += self.rewards.get("last_coin_bonus", 0.0)
-
         # --- Collect power pellet ---
         if self.grid[self.player_pos] == POWER:
             reward += self.rewards["power"]
@@ -133,6 +128,7 @@ class SimplePacmanEnv(gym.Env):
                 reward += self.rewards["eat_ghost"]
                 # Ghost dies and spawns after a delay
                 self.ghost_alive = False
+                self.ghost_pos = GHOST_START
                 self.ghost_respawn_timer = int(self.cfg.ghost_respawn_delay)
             else:  # Player dies
                 reward += self.rewards["death"]
@@ -145,10 +141,11 @@ class SimplePacmanEnv(gym.Env):
 
         # --- Step penalty ---
         reward += self.rewards["step"]
+        if self.player_pos == prev_player_pos:
+            reward += self.rewards.get("idle", 0.0)
 
         # --- Update timers ---
         if self.power_timer > 0:
-            reward += self.rewards.get("power_tick", 0.0)
             self.power_timer -= 1
 
         truncated = self.steps >= self.cfg.max_steps
@@ -199,6 +196,36 @@ class SimplePacmanEnv(gym.Env):
                 dirs.append((dy, dx))
         return dirs
 
+    def _is_ghost_intersection(self, pos: Tuple[int, int], current_dir: Tuple[int, int] | None) -> bool:
+        """
+        Devuelve True si el fantasma está en una intersección donde puede/conviene
+        reconsiderar su dirección.
+
+        Regla:
+        - Si hay 3 o más salidas libres -> intersección.
+        - Si hay exactamente 2 salidas:
+            * Si son opuestas (pasillo recto)      -> NO intersección.
+            * Si no son opuestas (curva/esquina)   -> SÍ intersección.
+        """
+        free_dirs = self._valid_directions(pos)
+
+        if current_dir is None:
+            # Justo respawn o sin dirección previa: lo tratamos como intersección
+            return True
+
+        if len(free_dirs) >= 3:
+            return True
+
+        if len(free_dirs) == 2:
+            d1, d2 = free_dirs
+            # ¿Son opuestas?
+            if d1[0] == -d2[0] and d1[1] == -d2[1]:
+                return False  # pasillo recto
+            else:
+                return True   # esquina
+
+        return False
+
     def _ghost_should_move(self) -> bool:
         """Return True if the ghost should move this step, taking into account power-time speed."""
         if self.power_timer <= 0:
@@ -213,8 +240,6 @@ class SimplePacmanEnv(gym.Env):
             if self.ghost_respawn_timer > 0:
                 self.ghost_respawn_timer -= 1
             if self.ghost_respawn_timer == 0:
-                # Respawn fixed pos
-                self.ghost_pos = GHOST_START
                 self.ghost_dir = None
                 self.ghost_alive = True
 
@@ -240,49 +265,138 @@ class SimplePacmanEnv(gym.Env):
 
     def _move_ghost(self):
         """
-        Fantasma perseguidor:
-        - Siempre intenta acercarse a Pacman (distancia Manhattan).
-        - Evita giros de 180º salvo que no haya otra opción (evita bucles arriba/abajo).
-        - Nunca atraviesa muros.
+        Movimiento del fantasma:
+
+        - Solo recalcula dirección cuando:
+            * no tiene dirección previa (inicio / respawn), o
+            * está en una intersección, o
+            * la dirección actual está bloqueada.
+        - Si power_time está activo (power_timer > 0):
+            * la nueva dirección se elige SIEMPRE aleatoria entre las válidas.
+        - Si NO está activo:
+            * 90%: dirección que minimiza la distancia Manhattan al jugador.
+            * 10%: dirección aleatoria entre las válidas.
+        - Entre intersecciones, si puede seguir recto, mantiene la dirección.
         """
         y, x = self.ghost_pos
 
         free_dirs = self._valid_directions(self.ghost_pos)
-        if not free_dirs:
-            return  # no hay movimiento posible (muy raro)
+        h, w = self.grid.shape
 
-        # Intentamos evitar el giro de 180º si hay más de una opción
-        if self.ghost_dir is not None and len(free_dirs) > 1:
-            rev = (-self.ghost_dir[0], -self.ghost_dir[1])
-            non_reverse = [d for d in free_dirs if d != rev]
-            if non_reverse:
-                free_dirs = non_reverse  # evitamos 180º si podemos
+        # 1) ¿Puede seguir en la dirección actual?
+        can_keep_dir = False
+        if self.ghost_dir is not None:
+            gy, gx = self.ghost_dir
+            ny, nx = y + gy, x + gx
+            if (
+                0 <= ny < h
+                and 0 <= nx < w
+                and self.grid[ny, nx] != WALL
+            ):
+                can_keep_dir = True
 
-        py, px = self.player_pos
+        # 2) ¿Está en una intersección?
+        is_intersection = self._is_ghost_intersection(self.ghost_pos, self.ghost_dir)
 
-        # Elegimos las direcciones que minimizan la distancia Manhattan a Pacman
-        def dist_after_move(d: Tuple[int, int]) -> int:
-            ny, nx = y + d[0], x + d[1]
-            return abs(py - ny) + abs(px - nx)
+        # 3) ¿Necesita nueva dirección?
+        need_new_dir = (
+            self.ghost_dir is None  # inicio / respawn
+            or not can_keep_dir     # muro delante
+            or is_intersection      # cruce / esquina
+        )
 
-        dists = [dist_after_move(d) for d in free_dirs]
-        min_dist = min(dists)
+        if need_new_dir:
+            # Partimos de las direcciones libres
+            cand_dirs = list(free_dirs)
 
-        # Ruptura de loops: 10% random alternativo
-        if self.rng.random() < 0.1 and len(free_dirs) > 1:
-            # evitar reverse si es posible
-            if self.ghost_dir is not None:
+            # Evitar giro de 180º si hay más de una opción
+            if self.ghost_dir is not None and len(cand_dirs) > 1:
                 rev = (-self.ghost_dir[0], -self.ghost_dir[1])
-                non_reverse = [d for d in free_dirs if d != rev]
-                free_dirs = non_reverse or free_dirs
-            dy, dx = free_dirs[self.rng.integers(len(free_dirs))]
-        else:
-            # política greedy perseguidora
-            best_dirs = [d for d, dd in zip(free_dirs, dists) if dd == min_dist]
-            dy, dx = best_dirs[self.rng.integers(len(best_dirs))]
+                non_reverse = [d for d in cand_dirs if d != rev]
+                if non_reverse:
+                    cand_dirs = non_reverse
 
-        self.ghost_dir = (dy, dx)
+            # --- Caso power activo: siempre aleatorio ---
+            if self.power_timer > 0:
+                dy, dx = cand_dirs[self.rng.integers(len(cand_dirs))]
+            else:
+                # --- Caso normal: 90% seguir el camino más corto real, 10% aleatorio ---
+                py, px = self.player_pos
+
+                bfs_dir = self._bfs_next_step_towards((y, x), (py, px))
+
+                # Aseguramos que la dirección BFS es candidata
+                if bfs_dir is not None and bfs_dir in cand_dirs:
+                    best_dirs = [bfs_dir]
+                else:
+                    # Si BFS falla (sin camino), caemos a greedy Manhattan sobre cand_dirs
+                    def dist_after_move(d: Tuple[int, int]) -> int:
+                        ny, nx = y + d[0], x + d[1]
+                        return abs(py - ny) + abs(px - nx)
+                    dists = [dist_after_move(d) for d in cand_dirs]
+                    min_dist = min(dists)
+                    best_dirs = [d for d, dd in zip(cand_dirs, dists) if dd == min_dist]
+
+                if self.rng.random() < 0.9:
+                    base = best_dirs
+                else:
+                    base = cand_dirs
+
+                dy, dx = base[self.rng.integers(len(base))]
+
+            self.ghost_dir = (dy, dx)
+
+        # 4) Avanza en la dirección actual (ya sea la antigua o la recalculada)
+        dy, dx = self.ghost_dir
         self.ghost_pos = (y + dy, x + dx)
+
+
+    def _bfs_next_step_towards(self, start: Tuple[int, int], goal: Tuple[int, int]) -> Tuple[int, int] | None:
+        """
+        Devuelve la primera dirección (dy, dx) del camino más corto desde `start` hasta `goal`
+        respetando los muros. Si no hay camino, devuelve None.
+        """
+        if start == goal:
+            return None
+
+        h, w = self.grid.shape
+        visited = [[False] * w for _ in range(h)]
+        parent: dict[Tuple[int, int], Tuple[int, int]] = {}
+
+        q = deque()
+        q.append(start)
+        visited[start[0]][start[1]] = True
+
+        while q:
+            cy, cx = q.popleft()
+            for dy, dx in ACTIONS.values():
+                ny, nx = cy + dy, cx + dx
+                if not (0 <= ny < h and 0 <= nx < w):
+                    continue
+                if visited[ny][nx]:
+                    continue
+                if self.grid[ny, nx] == WALL:
+                    continue
+
+                visited[ny][nx] = True
+                parent[(ny, nx)] = (cy, cx)
+
+                if (ny, nx) == goal:
+                    # Reconstruimos el camino al revés
+                    path = [(ny, nx)]
+                    while path[-1] != start:
+                        path.append(parent[path[-1]])
+                    path.reverse()
+                    first = path[1]
+                    dy0 = first[0] - start[0]
+                    dx0 = first[1] - start[1]
+                    return (dy0, dx0)
+
+                q.append((ny, nx))
+
+        # No hay camino
+        return None
+
 
 
     # ---------- Observations ----------
@@ -317,39 +431,12 @@ class SimplePacmanEnv(gym.Env):
     def render(self):
         """
         Renderiza el entorno según self.render_mode.
-        - 'ansi'      -> devuelve un string con el mapa en ASCII
         - 'rgb_array' -> devuelve un array (H, W, 3) uint8 para usar con imshow
         """
         if self.render_mode is None:
             raise NotImplementedError(
-                "SimplePacmanEnv: define render_mode='ansi' o 'rgb_array' al crear el entorno."
+                "SimplePacmanEnv: define render_mode='rgb_array' al crear el entorno."
             )
-
-        if self.render_mode == "ansi":
-            # Construimos una cuadricula de caracteres
-            h, w = self.grid.shape
-            lines = []
-            for y in range(h):
-                row_chars = []
-                for x in range(w):
-                    pos = (y, x)
-                    if pos == self.player_pos:
-                        ch = "C"  # Pacman
-                    elif pos == self.ghost_pos:
-                        ch = "G"  # Fantasma
-                    else:
-                        cell = self.grid[y, x]
-                        if cell == WALL:
-                            ch = "#"
-                        elif cell == COIN:
-                            ch = "."
-                        elif cell == POWER:
-                            ch = "P"
-                        else:
-                            ch = " "
-                    row_chars.append(ch)
-                lines.append("".join(row_chars))
-            return "\n".join(lines)
 
         if self.render_mode == "rgb_array":
             # Usamos las capas ya definidas para crear una imagen RGB sencilla
@@ -362,14 +449,23 @@ class SimplePacmanEnv(gym.Env):
             COIN_COLOR   = (255, 215, 0)     # Amarillo oro brillante
             POWER_COLOR  = (0, 200, 255)     # Cian brillante
             PLAYER_COLOR = (0, 255, 100)     # Verde lima
-            GHOST_COLOR  = (255, 60, 60)     # Rojo intenso
+            GHOST_NORMAL   = (255, 60, 60)     # Rojo intenso (persiguiendo)
+            GHOST_SCARED   = (255, 140, 255)   # Rosa brillante (random por power pellet)
+            GHOST_DEAD     = (180, 180, 180)   # Gris claro (respawn)
             # ==============================
 
             img[layers[:, :, 0] == 1] = WALL_COLOR
             img[layers[:, :, 1] == 1] = COIN_COLOR
             img[layers[:, :, 2] == 1] = POWER_COLOR
             img[layers[:, :, 3] == 1] = PLAYER_COLOR
-            img[layers[:, :, 4] == 1] = GHOST_COLOR
+            
+            ghost_mask = (layers[:, :, 4] == 1)
+            if self.ghost_respawn_timer > 0:
+                img[ghost_mask] = GHOST_DEAD
+            elif self.power_timer > 0:
+                img[ghost_mask] = GHOST_SCARED
+            else:
+                img[ghost_mask] = GHOST_NORMAL
 
             return img
 
