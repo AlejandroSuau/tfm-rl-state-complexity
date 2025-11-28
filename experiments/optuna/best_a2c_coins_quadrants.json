@@ -1,0 +1,14 @@
+{
+  "algo": "a2c",
+  "obs_mode": "coins_quadrants",
+  "timesteps_per_trial": 300000,
+  "best_value": 12.76849990338087,
+  "best_params": {
+    "lr": 0.0003659938572964598,
+    "gamma": 0.9651370340590695,
+    "ent_coef": 0.013269176985740766,
+    "net_arch": "64,64",
+    "n_steps": 64,
+    "gae_lambda": 0.9356726057706083
+  }
+}

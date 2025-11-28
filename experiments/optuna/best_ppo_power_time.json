@@ -1,0 +1,17 @@
+{
+  "algo": "ppo",
+  "obs_mode": "power_time",
+  "timesteps_per_trial": 300000,
+  "best_value": 42.71700009237975,
+  "best_params": {
+    "lr": 0.00021492934480628215,
+    "gamma": 0.9720812586292548,
+    "ent_coef": 0.01482052492037592,
+    "net_arch": "128,128",
+    "n_steps": 256,
+    "batch_size": 128,
+    "n_epochs": 16,
+    "gae_lambda": 0.9537988584297289,
+    "clip_range": 0.1611220280986063
+  }
+}

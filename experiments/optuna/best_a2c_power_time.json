@@ -1,0 +1,14 @@
+{
+  "algo": "a2c",
+  "obs_mode": "power_time",
+  "timesteps_per_trial": 300000,
+  "best_value": 10.576499887928367,
+  "best_params": {
+    "lr": 0.00031159027954591776,
+    "gamma": 0.9939266426073046,
+    "ent_coef": 0.01673755381627142,
+    "net_arch": "64,64",
+    "n_steps": 64,
+    "gae_lambda": 0.9710312645601442
+  }
+}
