@@ -136,7 +136,9 @@ def main():
         choices=list(ALGOS.keys()),
         help="Algoritmo con el que se entrenó el modelo.",
     )
-    parser.add_argument("--model-path", type=str, required=True,
+    
+    parser.add_argument("--seed", required=True, type=int)
+    parser.add_argument("--model-path", type=str,
                         help="Ruta al modelo .zip")
     parser.add_argument("--vecnorm-path", type=str, default=None,
                         help="Ruta al VecNormalize (.pkl) si se usó.")
@@ -158,21 +160,28 @@ def main():
     parser.add_argument(
         "--render",
         type=str,
-        default="ascii",
-        choices=["ascii", "rgb"],
-        help="Tipo de renderizado: 'ascii' (texto) o 'rgb' (imagen con matplotlib).",
+        default="rgb",
+        choices=["rgb"],
+        help="Tipo de renderizado: 'rgb' (imagen con matplotlib).",
     )
 
     args = parser.parse_args()
 
+    obs_mode = args.obs_mode.lower()
+    algo = args.algo.lower()
+    if args.model_path is None:
+        args.model_path = f"models/{algo}/best/{algo}_{obs_mode}_seed{args.seed}/best_model.zip"
+    if args.vecnorm_path is None:
+        args.vecnorm_path = f"models/{algo}/best/vecnorm_{algo}_{obs_mode}_seed{args.seed}.pkl"
+
     # Elegir clase de modelo
-    ModelClass = ALGOS[args.algo.lower()]
+    ModelClass = ALGOS[algo]
 
     # Determinar render_mode para el entorno
-    render_mode = "ansi" if args.render == "ascii" else "rgb_array"
+    render_mode = "rgb_array"
 
     # 1) Crear entorno base vectorizado
-    venv = DummyVecEnv([make_env(args.obs_mode, render_mode)])
+    venv = DummyVecEnv([make_env(obs_mode, render_mode)])
 
     # 2) Aplicar frame stacking si procede (como en entrenamiento)
     if args.frame_stack is not None and args.frame_stack > 1:
