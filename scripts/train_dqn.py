@@ -47,8 +47,8 @@ def main() -> None:
     ap.add_argument("--exploration-fraction", type=float, default=0.3)
     ap.add_argument("--exploration-final-eps", type=float, default=0.01)
     ap.add_argument("--net-arch", type=str, default="256,256")
-    ap.add_argument("--vecnorm", type=int, default=1)
-    ap.add_argument("--frame-stack", type=int, default=4)
+    ap.add_argument("--vecnorm", type=int, default=0)
+    ap.add_argument("--frame-stack", type=int, default=1)
     ap.add_argument(
         "--early-stop",
         type=int,

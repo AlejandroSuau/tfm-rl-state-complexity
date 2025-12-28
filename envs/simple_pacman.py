@@ -96,6 +96,7 @@ class SimplePacmanEnv(gym.Env):
         
         self.steps += 1
         prev_player_pos = self.player_pos
+        prev_ghost_pos  = self.ghost_pos
 
         self._move_player(action)
         
@@ -107,14 +108,20 @@ class SimplePacmanEnv(gym.Env):
         reward = 0.0
         terminated = False
 
-        # --- Collect coin ---
-        if self.grid[self.player_pos] == COIN:
+        direct_collision = (self.player_pos == self.ghost_pos)
+
+        # detección por “swap”
+        swap_collision = (
+            self.player_pos == prev_ghost_pos and 
+            self.ghost_pos == prev_player_pos
+        )
+
+        if self.grid[self.player_pos] == COIN: # --- Collect coin ---
             reward += self.rewards["coin"]
             self.grid[self.player_pos] = EMPTY
             self.coins_remaining -= 1
-
-        # --- Collect power pellet ---
-        if self.grid[self.player_pos] == POWER:
+        
+        if self.grid[self.player_pos] == POWER: # --- Collect power pellet ---
             reward += self.rewards["power"]
             self.grid[self.player_pos] = EMPTY
             self.power_timer = int(self.cfg.power_duration)
@@ -122,7 +129,7 @@ class SimplePacmanEnv(gym.Env):
             self.powers_picked += 1
 
         # --- Collision with ghost (only if it is alive) ---
-        if self.ghost_alive and self.player_pos == self.ghost_pos:
+        if self.ghost_alive and (direct_collision or swap_collision):
             if self.power_timer > 0:  # Ghost is vulnerable
                 self.ghosts_eaten += 1
                 reward += self.rewards["eat_ghost"]
@@ -140,9 +147,10 @@ class SimplePacmanEnv(gym.Env):
             terminated = True
 
         # --- Step penalty ---
-        reward += self.rewards["step"]
         if self.player_pos == prev_player_pos:
-            reward += self.rewards.get("idle", 0.0)
+            reward += self.rewards["idle"]
+        else:
+            reward += self.rewards["step"]
 
         # --- Update timers ---
         if self.power_timer > 0:

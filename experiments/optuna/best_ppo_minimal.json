@@ -1,17 +1,17 @@
 {
   "algo": "ppo",
   "obs_mode": "minimal",
-  "timesteps_per_trial": 300000,
-  "best_value": 18.166999804414807,
+  "timesteps_per_trial": 1000000,
+  "best_value": 43.73999974429607,
   "best_params": {
-    "lr": 0.0004985651691053133,
-    "gamma": 0.9328080782667906,
-    "ent_coef": 0.0012823683664881713,
+    "lr": 0.0003465703982532899,
+    "gamma": 0.9340723359801879,
+    "ent_coef": 0.01571743040799521,
     "net_arch": "64,64",
-    "n_steps": 64,
+    "n_steps": 256,
     "batch_size": 64,
-    "n_epochs": 8,
-    "gae_lambda": 0.9034086171444687,
-    "clip_range": 0.2930535502322874
+    "n_epochs": 16,
+    "gae_lambda": 0.9654757002910408,
+    "clip_range": 0.20133930397353283
   }
 }

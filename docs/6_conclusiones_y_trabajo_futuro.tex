@@ -1,0 +1,42 @@
+\chapter{Conclusiones y trabajo futuro}
+
+\section{Conclusiones del trabajo}
+
+El presente trabajo ha analizado de forma empírica el impacto de la complejidad de la representación del estado en el rendimiento de distintos algoritmos de Aprendizaje por Refuerzo en un entorno controlado inspirado en el videojuego Pac-Man. A través del diseño de un entorno propio y de una batería de experimentos sistemáticos, se ha podido estudiar cómo diferentes configuraciones de observación influyen en la estabilidad, eficiencia y calidad de las políticas aprendidas.
+
+Los resultados obtenidos muestran que la relación entre complejidad del estado y rendimiento del agente depende fuertemente del algoritmo considerado. Representaciones excesivamente simples limitan la capacidad del agente para planificar estrategias efectivas, mientras que el aumento de la complejidad puede traducirse en mejoras sustanciales cuando el algoritmo es capaz de explotar la información adicional. No obstante, dicho aumento también puede incrementar la varianza del aprendizaje y la sensibilidad a la configuración del entrenamiento, por lo que su beneficio no es universal ni garantiza la resolución completa de la tarea.
+
+Entre los algoritmos analizados, DQN ha alcanzado los mayores valores de recompensa media y de \textit{completion ratio}, especialmente al incorporar observaciones más informativas, lo que sugiere una alta capacidad para explotar representaciones del estado estructuradas en este entorno. PPO ha mostrado un comportamiento competitivo en configuraciones concretas y una elevada capacidad de mejora cuando se dispone de una optimización exhaustiva de hiperparámetros, mientras que A2C ha destacado por su estabilidad pero con un rendimiento global inferior en términos de progreso hacia el objetivo. No obstante, ninguno de los algoritmos ha logrado resolver completamente la tarea de manera consistente, manteniendo tasas de éxito nulas, lo que pone de manifiesto la dificultad inherente del problema y las limitaciones de los enfoques considerados.
+
+En conjunto, el trabajo confirma que el diseño del espacio de observación es un factor determinante en el éxito del aprendizaje por refuerzo, y que dicho diseño debe equilibrar cuidadosamente simplicidad y expresividad en función del algoritmo y del entorno considerado.
+
+\section{Evaluación del grado de logro de los objetivos}
+
+Los objetivos planteados al inicio del proyecto se han alcanzado de forma satisfactoria. En primer lugar, se ha diseñado e implementado un entorno de Aprendizaje por Refuerzo propio, compatible con el ecosistema Gymnasium y Stable-Baselines3, que permite modificar de manera controlada la complejidad de la observación sin alterar las dinámicas ni la función de recompensa.
+
+En segundo lugar, se han entrenado y evaluado distintos algoritmos representativos del Aprendizaje por Refuerzo Profundo bajo múltiples configuraciones de estado, utilizando un protocolo experimental homogéneo y reproducible. Este enfoque ha permitido analizar de forma sistemática el impacto de la representación del estado sobre el rendimiento del aprendizaje.
+
+Finalmente, se ha llevado a cabo un análisis comparativo detallado que ha permitido extraer conclusiones fundamentadas sobre las ventajas y limitaciones de cada algoritmo y sobre el papel de la complejidad observacional. Aunque el objetivo de resolver completamente el entorno no se ha alcanzado, este hecho constituye en sí mismo un resultado relevante que refuerza las conclusiones extraídas.
+
+\section{Evaluación crítica de la planificación y metodología}
+
+Desde el punto de vista metodológico, el proyecto ha seguido un enfoque riguroso y estructurado, apoyado en buenas prácticas de desarrollo de software y experimentación en aprendizaje automático. La modularidad del código, el uso de un repositorio versionado y la adopción de herramientas estándar como Optuna y TensorBoard han facilitado la reproducibilidad y el análisis sistemático de los resultados.
+
+No obstante, el proyecto también ha puesto de manifiesto algunas limitaciones prácticas. El elevado coste computacional asociado al entrenamiento y ajuste de hiperparámetros, especialmente en algoritmos como DQN y PPO, ha condicionado el número de configuraciones y ejecuciones exhaustivas que podían realizarse. Asimismo, la dependencia de los resultados respecto a la semilla aleatoria introduce una variabilidad que, aunque mitigada mediante evaluaciones múltiples, no puede eliminarse por completo.
+
+En retrospectiva, una planificación inicial que incorporase desde etapas tempranas herramientas de optimización automática de hiperparámetros podría haber reducido el tiempo dedicado a ajustes manuales. A pesar de ello, la metodología empleada ha resultado adecuada para responder a la pregunta de investigación planteada.
+
+\section{Consideraciones de sostenibilidad, diversidad y aspectos ético-sociales}
+
+El proyecto presenta un impacto limitado en términos de sostenibilidad, diversidad y aspectos ético-sociales, dado su carácter fundamentalmente técnico y experimental. No obstante, el elevado consumo computacional asociado al entrenamiento de modelos de Aprendizaje por Refuerzo plantea consideraciones relevantes en términos de eficiencia energética y huella de carbono, especialmente en contextos de investigación a gran escala.
+
+Desde una perspectiva ética, el trabajo no involucra datos personales ni aplicaciones con impacto directo sobre individuos o colectivos, por lo que no se identifican riesgos significativos en términos de privacidad, sesgo o discriminación. Sin embargo, los resultados obtenidos subrayan la importancia de diseñar agentes de aprendizaje con representaciones del estado adecuadas, ya que decisiones erróneas en este ámbito pueden dar lugar a comportamientos subóptimos o impredecibles en aplicaciones reales.
+
+\section{Trabajo futuro}
+
+A partir de los resultados obtenidos, se identifican diversas líneas de trabajo futuro que podrían ampliar y profundizar el análisis realizado. En primer lugar, sería de interés explorar representaciones del estado basadas en observaciones visuales completas, utilizando arquitecturas convolucionales que permitan aprender directamente a partir de imágenes del entorno.
+
+Asimismo, la introducción de mecanismos de memoria, como redes recurrentes o arquitecturas basadas en atención, podría mejorar el desempeño en entornos parcialmente observables y permitir una mejor explotación de información temporal. Otra línea prometedora consiste en analizar la capacidad de generalización de los agentes entrenados, evaluando su comportamiento en mapas o configuraciones del entorno no vistas durante el entrenamiento.
+
+Finalmente, futuros trabajos podrían abordar el estudio de técnicas de aprendizaje por refuerzo multiagente o la incorporación de estrategias de aprendizaje jerárquico, con el objetivo de descomponer la tarea en subobjetivos y facilitar la planificación a largo plazo. Estas extensiones permitirían profundizar en la relación entre percepción, complejidad del estado y toma de decisiones en entornos más realistas.
+

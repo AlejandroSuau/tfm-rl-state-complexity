@@ -1,0 +1,19 @@
+{
+  "algo": "dqn",
+  "obs_mode": "minimal",
+  "timesteps_per_trial": 300000,
+  "best_value": 21.90000175088644,
+  "best_params": {
+    "lr": 0.0003659216163718441,
+    "gamma": 0.9547833750437409,
+    "net_arch": "128,128",
+    "buffer_size": 500000,
+    "learning_starts": 20000,
+    "batch_size": 512,
+    "train_freq": 1,
+    "gradient_steps": 2,
+    "target_update_interval": 2000,
+    "exploration_fraction": 0.26324432238048456,
+    "exploration_final_eps": 0.030639861827565174
+  }
+}

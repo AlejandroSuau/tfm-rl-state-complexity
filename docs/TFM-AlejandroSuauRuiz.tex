@@ -87,11 +87,6 @@ citecolor=blue,
 \phantomsection
 \addcontentsline{toc}{chapter}{Lista de Figuras}
 \listoffigures
-% lista de tablas
-\cleardoublepage
-\phantomsection
-\addcontentsline{toc}{chapter}{Lista de Tablas}
-\listoftables
 
 \thispagestyle{empty}
 
@@ -113,48 +108,16 @@ citecolor=blue,
 
 \include{3_planificacion_del_proyecto}
 
-\section{Métodos y recursos}
+\include{4_metodologia_y_experimento}
 
-En estas secciones, es necesario describir:
+\include{5_resultados_experimentales}
 
-\begin{itemize}
-    \item Los aspectos más relevantes del diseño y desarrollo del proyecto.
-    \item La metodología utilizada en el proceso de desarrollo, describiendo las alternativas posibles, las decisiones que se han tomado y los criterios utilizados para tomar estas decisiones.
-    \item Una descripción de los productos que se han creado.
-\end{itemize}
-
-La estructura de estas secciones puede cambiar según el tipo de proyecto que se esté desarrollando.
-
-\section{Resultados}
-
-Describa los resultados obtenidos utilizando la metodología descrita anteriormente.
-
-\section{Conclusiones y trabajo futuro}
-
-Esta sección debe incluir lo siguiente:
-
-\begin{itemize}
-    \item Una descripción de las conclusiones del trabajo.
-    \item Una evaluación crítica del grado de logro de los objetivos iniciales.
-    \item Una evaluación crítica de la planificación y metodología utilizadas en el proyecto.
-    \item Considerando los desafíos de sostenibilidad, diversidad y ético-sociales vinculados al proyecto.
-    \item Una discusión de temas para trabajo futuro potencial que no se hayan explorado en este proyecto.
-\end{itemize}
-
-\section{Glosario}
-
-Definición de los términos y acrónimos más relevantes utilizados en este informe.
+\include{6_conclusiones_y_trabajo_futuro}
 
 % bibliografía
 \nocite{*}
 \addcontentsline{toc}{chapter}{Bibliografía}
 \bibliographystyle{plainnat}
 \bibliography{referencias}
-
-\section{Anexos}
-
-\begin{enumerate}
-    \item -
-\end{enumerate}
 
 \end{document}

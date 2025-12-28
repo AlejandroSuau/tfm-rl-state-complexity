@@ -66,16 +66,15 @@ ACTIONS: Dict[int, Tuple[int, int]] = {
     1: (1, 0), # down
     2: (0, -1), # left
     3: (0, 1), # right
-    4: (0, 0), # no-op
 }
 
 DEFAULT_REWARDS = {
-    "coin": 1.0,
+    "coin": 1.1,
     "power": 10.0,
     "eat_ghost": 5.0,
     "clear": 1000.0,
     "death": -100.0,
-    "step": -0.01,
-    "idle": -0.02
+    "step": -0.1,
+    "idle": -0.2
 }
 

@@ -171,8 +171,8 @@ def main():
     algo = args.algo.lower()
     if args.model_path is None:
         args.model_path = f"models/{algo}/best/{algo}_{obs_mode}_seed{args.seed}/best_model.zip"
-    if args.vecnorm_path is None:
-        args.vecnorm_path = f"models/{algo}/best/vecnorm_{algo}_{obs_mode}_seed{args.seed}.pkl"
+    #if args.vecnorm_path is None:
+    #    args.vecnorm_path = f"models/{algo}/best/vecnorm_{algo}_{obs_mode}_seed{args.seed}.pkl"
 
     # Elegir clase de modelo
     ModelClass = ALGOS[algo]

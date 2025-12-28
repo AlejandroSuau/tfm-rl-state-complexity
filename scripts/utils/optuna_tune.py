@@ -45,34 +45,22 @@ def make_env(obs_mode: str, seed: int, rank: int = 0):
     return _init
 
 
-def build_vecenv(algo: str, obs_mode: str, seed: int, n_envs: int = 8, frame_stack: int = 4):
+def build_vecenv(algo: str, obs_mode: str, seed: int, n_envs: int = 8):
     """
-    Creates a vectorized environment depending on the algorithm type.
-
-    - PPO / A2C: use SubprocVecEnv (multi-process) or DummyVecEnv (single-thread)
-      with normalization of both observations and rewards.
-    - DQN: off-policy, therefore use a single environment, optional frame stacking,
-      and normalize only observations.
-
-    Returns:
-        Vectorized environment compatible with Stable-Baselines3.
+    - PPO / A2C: multi-env + normalización de obs y reward.
+    - DQN: un solo env, sin frame stacking explícito (equivale a frame_stack = 1),
+      normalizando solo observaciones.
     """
     if algo in {"ppo", "a2c"}:
-        # On-policy algorithms can run multiple envs in parallel.
         if n_envs > 1:
             venv = SubprocVecEnv([make_env(obs_mode, seed, i) for i in range(n_envs)])
         else:
             venv = DummyVecEnv([make_env(obs_mode, seed, 0)])
-        # Normalize both observations and rewards for stability.
         venv = VecNormalize(venv, norm_obs=True, norm_reward=True, clip_reward=10.0)
         return venv
     else:
-        # DQN typically runs on a single environment (off-policy learning).
+        # DQN: un único entorno, sin VecFrameStack (frame_stack = 1 implícito)
         venv = DummyVecEnv([make_env(obs_mode, seed, 0)])
-        # Optional frame stacking to provide temporal context to DQN.
-        if frame_stack and frame_stack > 1:
-            venv = VecFrameStack(venv, n_stack=frame_stack)
-        # Normalize only observations (reward normalization not needed off-policy).
         venv = VecNormalize(venv, norm_obs=True, norm_reward=False, clip_obs=10.0)
         return venv
 
@@ -171,7 +159,6 @@ def suggest_dqn(trial):
         "target_update_interval": trial.suggest_categorical("target_update_interval", [500, 1000, 2000]),
         "exploration_fraction": trial.suggest_float("exploration_fraction", 0.1, 0.5),
         "exploration_final_eps": trial.suggest_float("exploration_final_eps", 0.01, 0.05),
-        "frame_stack": trial.suggest_categorical("frame_stack", [1, 4]),
     }
 
 
@@ -281,7 +268,8 @@ def main():
             env = build_vecenv("a2c", args.obs_mode, args.seed, n_envs=args.n_envs)
         elif args.algo == "dqn":
             specific = suggest_dqn(trial)
-            env = build_vecenv("dqn", args.obs_mode, args.seed, n_envs=1, frame_stack=specific["frame_stack"])
+            env = build_vecenv("dqn", args.obs_mode, args.seed, n_envs=1)  # frame_stack = 1 implícito
+
         else:
             raise ValueError("Unsupported algorithm selected.")
 

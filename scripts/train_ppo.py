@@ -61,8 +61,8 @@ def main() -> None:
     ap.add_argument("--n-epochs", type=int, default=10, help="épocas por update PPO")
 
     # Opciones de normalización y frame stacking (paralelo a DQN)
-    ap.add_argument("--vecnorm", type=int, default=1, help="1 = usar VecNormalize, 0 = no")
-    ap.add_argument("--frame-stack", type=int, default=4, help="nº de frames apilados (>=1)")
+    ap.add_argument("--vecnorm", type=int, default=0, help="1 = usar VecNormalize, 0 = no")
+    ap.add_argument("--frame-stack", type=int, default=1, help="nº de frames apilados (>=1)")
 
     # gSDE (no se usa en acciones discretas, pero dejamos flags por compatibilidad)
     ap.add_argument("--use-sde", type=int, default=0)

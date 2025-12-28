@@ -57,8 +57,8 @@ def main() -> None:
     ap.add_argument("--n-steps", type=int, default=32, help="pasos por entorno antes de cada update")
 
     # Normalización y frame stacking (alineado con PPO/DQN)
-    ap.add_argument("--vecnorm", type=int, default=1, help="1 = usar VecNormalize, 0 = no")
-    ap.add_argument("--frame-stack", type=int, default=4, help="nº de frames apilados (>=1)")
+    ap.add_argument("--vecnorm", type=int, default=0, help="1 = usar VecNormalize, 0 = no")
+    ap.add_argument("--frame-stack", type=int, default=1, help="nº de frames apilados (>=1)")
 
     # Early stopping + evaluación (igual estilo que DQN/PPO)
     ap.add_argument(

@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 from stable_baselines3 import A2C, DQN, PPO
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize, VecFrameStack
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 from envs.simple_pacman import ObsConfig, SimplePacmanEnv
 
@@ -42,22 +42,17 @@ def build_eval_env(
     obs_mode: str,
     seed: int,
     vecnorm_path: str | None,
-    frame_stack: int = 1,
 ):
     """
-    Crea un entorno de evaluación que replica la tubería de entrenamiento:
-    SimplePacmanEnv -> Monitor -> DummyVecEnv -> (opcional) VecFrameStack -> (opcional) VecNormalize.
+    SimplePacmanEnv -> Monitor -> DummyVecEnv -> (opcional) VecNormalize.
+    (frame_stack = 1 fijo, no se aplica stacking en evaluación)
     """
     def make_env():
         return Monitor(SimplePacmanEnv(ObsConfig(mode=obs_mode), seed=seed))
 
     env = DummyVecEnv([make_env])
 
-    # 1) Frame stack si procede (para cualquier algoritmo)
-    if frame_stack and frame_stack > 1:
-        env = VecFrameStack(env, n_stack=frame_stack)
-
-    # 2) VecNormalize si hay .pkl
+    # VecNormalize si hay .pkl
     if vecnorm_path and os.path.exists(vecnorm_path):
         try:
             env = VecNormalize.load(vecnorm_path, env)
@@ -72,14 +67,14 @@ def build_eval_env(
     return env
 
 
+
 def evaluate_model(
     algo: str,
     model_path: str,
     obs_mode: str,
     episodes: int,
     seed: int = 123,
-    vecnorm_path: str | None = None,
-    frame_stack: int = 1,
+    vecnorm_path: str | None = None
 ) -> Tuple[float, float, float, float, float, float]:
     """
     Evaluate a saved model for a given number of episodes, computing aggregate metrics.
@@ -87,7 +82,7 @@ def evaluate_model(
     Returns:
         mean_reward, std_reward, mean_len, success_rate, completion_ratio_mean, near_clear_rate
     """
-    env = build_eval_env(algo, obs_mode, seed, vecnorm_path, frame_stack)
+    env = build_eval_env(algo, obs_mode, seed, vecnorm_path)
     ModelCls = ALGOS[algo]
     model = ModelCls.load(model_path, env=env, device="cpu")
 
@@ -172,26 +167,23 @@ def evaluate_model(
     return mean_r, std_r, mean_len, succ_rate, mean_ratio, near_rate
 
 
-def parse_index_or_glob(index_csv: str) -> List[dict]:
+def parse_glob() -> List[dict]:
     """
-    Use the CSV index if present; otherwise, glob models for PPO/A2C/DQN.
-    Returns a list of dicts with: algo, obs_mode, seed, model_path.
+    Devuelve una lista de dicts con: algo, obs_mode, seed, model_path.
     """
-    if os.path.exists(index_csv):
-        with open(index_csv, "r", encoding="utf-8") as f:
-            return list(csv.DictReader(f))
-
     rows: List[dict] = []
-    patterns: Sequence[Tuple[str, str, str]] = [
-        ("ppo", r"pacman_ppo_(?P<obs>.+)_seed(?P<seed>\d+)\.zip$", "pacman_ppo_*_seed*.zip"),
-        ("a2c", r"pacman_a2c_(?P<obs>.+)_seed(?P<seed>\d+)\.zip$", "pacman_a2c_*_seed*.zip"),
-        ("dqn", r"pacman_dqn_(?P<obs>.+)_seed(?P<seed>\d+)\.zip$", "pacman_dqn_*_seed*.zip"),
-    ]
-    for algo, regex, glob_pat in patterns:
-        pat = re.compile(regex)
-        for path in glob.glob(os.path.join("models", glob_pat)):
-            name = os.path.basename(path)
-            m = pat.match(name)
+
+    # Nueva convención:
+    # models/<algo>/best/<algo>_<obs>_seed<seed>/best_model.zip
+    algos = ["ppo", "a2c", "dqn"]
+    for algo in algos:
+        pattern = os.path.join("models", algo, "best", f"{algo}_*_seed*", "best_model.zip")
+        for path in glob.glob(pattern):
+            # path = models/a2c/best/a2c_coins_quadrants_seed10/best_model.zip
+            model_dir = os.path.dirname(path)
+            name = os.path.basename(model_dir)  # e.g. a2c_coins_quadrants_seed10
+
+            m = re.match(rf"{algo}_(?P<obs>.+)_seed(?P<seed>\d+)$", name)
             if not m:
                 continue
 
@@ -203,7 +195,9 @@ def parse_index_or_glob(index_csv: str) -> List[dict]:
                     "model_path": path,
                 }
             )
+
     return rows
+
 
 
 def maybe_vecnorm_path(row: dict) -> str | None:
@@ -246,8 +240,7 @@ def _write_metrics_csv(path: str, header: List[str], rows: List[List[object]]) -
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--index", type=str, default="experiments/run_index.csv")
-    ap.add_argument("--episodes", type=int, default=50)
+    ap.add_argument("--episodes", type=int, default=100)
     ap.add_argument("--out", type=str, default="experiments/metrics.csv")
 
     ap.add_argument(
@@ -272,7 +265,7 @@ def main() -> None:
 
     args = ap.parse_args()
 
-    rows = parse_index_or_glob(args.index)
+    rows = parse_glob()
     if not rows:
         print("[WARN] No hay modelos. Ejecuta train_* primero.")
         return
@@ -320,11 +313,9 @@ def main() -> None:
             continue
 
         vecnorm = maybe_vecnorm_path(r)
-        # frame_stack viene del índice si está; si no, heurística:
-        fs_hint = int(r.get("frame_stack", 4 if algo == "dqn" or algo == "ppo" else 1))
         print(
             f"[EVAL] {algo} | {obs_mode} | seed={seed} | "
-            f"vecnorm={'yes' if vecnorm else 'no'} | fs={fs_hint}"
+            f"vecnorm={'yes' if vecnorm else 'no'}"
         )
 
         mean_r, std_r, mean_len, succ, mean_ratio, near_rate = evaluate_model(
@@ -334,7 +325,6 @@ def main() -> None:
             episodes=args.episodes,
             seed=123,
             vecnorm_path=vecnorm,
-            frame_stack=fs_hint,
         )
 
         row_out = [
@@ -354,17 +344,31 @@ def main() -> None:
         global_rows.append(row_out)
         per_algo.setdefault(algo, []).append(row_out)
 
-    # (1) Write global metrics (backwards compatible)
-    _write_metrics_csv(args.out, header, global_rows)
-    print(f"[OK] métricas en {args.out}")
+        # (A) Guardar métricas de ESTE modelo en su propio CSV:
+        #     experiments/<algo>/<algo>_<obs_mode>_seed<seed>_metrics.csv
+        base_dir = os.path.dirname(args.out) or "experiments"
+        algo_dir = os.path.join(base_dir, algo)
+        os.makedirs(algo_dir, exist_ok=True)
 
-    # (2) Write per-algorithm metrics under experiments/<algo>/metrics.csv
-    base_dir = os.path.dirname(args.out) or "."
+        run_filename = f"{algo}_{obs_mode}_seed{seed}_metrics.csv"
+        run_path = os.path.join(algo_dir, run_filename)
+
+        _write_metrics_csv(run_path, header, [row_out])
+        print(f"[OK] métricas individuales en {run_path}")
+
+    # (1) CSV global con TODO lo que se ha evaluado (según filtros)
+    _write_metrics_csv(args.out, header, global_rows)
+    print(f"[OK] métricas globales en {args.out}")
+
+    # (2) CSV agrupado por algoritmo: experiments/<algo>/<algo>_all_metrics.csv
+    base_dir = os.path.dirname(args.out) or "experiments"
     for algo, rows_list in per_algo.items():
         algo_dir = os.path.join(base_dir, algo)
-        algo_out = os.path.join(algo_dir, os.path.basename(args.out))  # e.g., experiments/ppo/metrics.csv
-        _write_metrics_csv(algo_out, header, rows_list)
-        print(f"[OK] métricas por-algoritmo en {algo_out}")
+        os.makedirs(algo_dir, exist_ok=True)
+        algo_all_path = os.path.join(algo_dir, f"{algo}_all_metrics.csv")
+        _write_metrics_csv(algo_all_path, header, rows_list)
+        print(f"[OK] métricas agregadas de {algo} en {algo_all_path}")
+
 
 
 if __name__ == "__main__":
